@@ -1,0 +1,46 @@
+name: mood-diary
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mood_diary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mood_diary}
+      POSTGRES_DB: ${POSTGRES_DB:-mood_diary}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mood_diary}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mood_diary}:${POSTGRES_PASSWORD:-mood_diary}@postgres:5432/${POSTGRES_DB:-mood_diary}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
