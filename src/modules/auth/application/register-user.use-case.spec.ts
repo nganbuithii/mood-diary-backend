@@ -12,6 +12,10 @@ class FakeUserRepository implements UserRepository {
     return Promise.resolve(this.existingUsersByEmail.get(email) ?? null);
   }
 
+  findById(): Promise<UserEntity | null> {
+    throw new Error('not used in register tests');
+  }
+
   create(input: CreateUserInput): Promise<UserEntity> {
     this.createCalls.push(input);
     return Promise.resolve({

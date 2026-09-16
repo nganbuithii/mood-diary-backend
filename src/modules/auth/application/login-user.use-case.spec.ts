@@ -3,6 +3,8 @@ import { InvalidCredentialsError } from '../domain/invalid-credentials.error';
 import { UserEntity, UserRepository } from '../domain/user.repository';
 import { PasswordHasher } from '../domain/password-hasher';
 import { AccessTokenPayload, TokenIssuer } from '../domain/token-issuer';
+import { GeneratedRefreshToken, RefreshTokenIssuer } from '../domain/refresh-token-issuer';
+import { CreateRefreshTokenInput, RefreshTokenEntity, RefreshTokenRepository } from '../domain/refresh-token.repository';
 
 function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
   return {
@@ -21,6 +23,10 @@ class FakeUserRepository implements UserRepository {
 
   findByEmail(email: string): Promise<UserEntity | null> {
     return Promise.resolve(this.usersByEmail.get(email) ?? null);
+  }
+
+  findById(): Promise<UserEntity | null> {
+    throw new Error('not used in login tests');
   }
 
   create(): Promise<UserEntity> {
@@ -52,6 +58,54 @@ class FakeTokenIssuer implements TokenIssuer {
   }
 }
 
+class FakeRefreshTokenIssuer implements RefreshTokenIssuer {
+  public generateCallCount = 0;
+
+  generate(): GeneratedRefreshToken {
+    this.generateCallCount += 1;
+    return {
+      rawToken: `raw-refresh-${this.generateCallCount}`,
+      tokenHash: `hash-refresh-${this.generateCallCount}`,
+      expiresAt: new Date('2026-02-01T00:00:00.000Z'),
+    };
+  }
+
+  hash(): string {
+    throw new Error('not used in login tests');
+  }
+}
+
+class FakeRefreshTokenRepository implements RefreshTokenRepository {
+  public createCalls: CreateRefreshTokenInput[] = [];
+
+  create(input: CreateRefreshTokenInput): Promise<RefreshTokenEntity> {
+    this.createCalls.push(input);
+    return Promise.resolve({
+      id: `refresh-${this.createCalls.length}`,
+      revokedAt: null,
+      replacedByTokenId: null,
+      createdAt: new Date(),
+      ...input,
+    });
+  }
+
+  findByTokenHash(): Promise<RefreshTokenEntity | null> {
+    throw new Error('not used in login tests');
+  }
+
+  revokeIfActive(): Promise<boolean> {
+    throw new Error('not used in login tests');
+  }
+
+  revokeById(): Promise<void> {
+    throw new Error('not used in login tests');
+  }
+
+  revokeFamily(): Promise<void> {
+    throw new Error('not used in login tests');
+  }
+}
+
 describe('LoginUserUseCase', () => {
   const correctPassword = 'correct-password';
 
@@ -59,19 +113,47 @@ describe('LoginUserUseCase', () => {
     const userRepository = new FakeUserRepository(user ? new Map([[user.email, user]]) : undefined);
     const passwordHasher = new FakePasswordHasher(correctPassword);
     const tokenIssuer = new FakeTokenIssuer();
-    const useCase = new LoginUserUseCase(userRepository, passwordHasher, tokenIssuer);
-    return { useCase, userRepository, passwordHasher, tokenIssuer };
+    const refreshTokenIssuer = new FakeRefreshTokenIssuer();
+    const refreshTokenRepository = new FakeRefreshTokenRepository();
+    const useCase = new LoginUserUseCase(
+      userRepository,
+      passwordHasher,
+      tokenIssuer,
+      refreshTokenIssuer,
+      refreshTokenRepository,
+    );
+    return { useCase, userRepository, passwordHasher, tokenIssuer, refreshTokenIssuer, refreshTokenRepository };
   }
 
   it('logs in with correct email and password', async () => {
     const user = buildUser();
-    const { useCase, tokenIssuer } = setup(user);
+    const { useCase, tokenIssuer, refreshTokenRepository } = setup(user);
 
     const result = await useCase.execute({ email: user.email, password: correctPassword });
 
     expect(result.accessToken).toBe(`token-for-${user.id}`);
+    expect(result.refreshToken).toBe('raw-refresh-1');
     expect(result.user).toEqual(user);
     expect(tokenIssuer.issuedPayloads).toEqual([{ sub: user.id, email: user.email }]);
+    expect(refreshTokenRepository.createCalls).toEqual([
+      {
+        userId: user.id,
+        tokenHash: 'hash-refresh-1',
+        familyId: expect.any(String),
+        expiresAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+  });
+
+  it('creates a fresh token family on every login', async () => {
+    const user = buildUser();
+    const { useCase, refreshTokenRepository } = setup(user);
+
+    await useCase.execute({ email: user.email, password: correctPassword });
+    await useCase.execute({ email: user.email, password: correctPassword });
+
+    const [firstFamilyId, secondFamilyId] = refreshTokenRepository.createCalls.map((call) => call.familyId);
+    expect(firstFamilyId).not.toBe(secondFamilyId);
   });
 
   it('normalizes email (trim + lowercase) before lookup', async () => {
@@ -112,14 +194,15 @@ describe('LoginUserUseCase', () => {
     expect(passwordHasher.verifyCalls[0].hash.length).toBeGreaterThan(0);
   });
 
-  it('does not issue a token when credentials are invalid', async () => {
+  it('does not issue any token when credentials are invalid', async () => {
     const user = buildUser();
-    const { useCase, tokenIssuer } = setup(user);
+    const { useCase, tokenIssuer, refreshTokenRepository } = setup(user);
 
     await expect(useCase.execute({ email: user.email, password: 'wrong-password' })).rejects.toThrow(
       InvalidCredentialsError,
     );
 
     expect(tokenIssuer.issuedPayloads).toHaveLength(0);
+    expect(refreshTokenRepository.createCalls).toHaveLength(0);
   });
 });
