@@ -5,3 +5,4 @@ coverage
 .git
 .vscode
 *.log
+.pnpm-store
