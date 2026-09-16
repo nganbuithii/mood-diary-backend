@@ -4,6 +4,8 @@
 
 [![CI](https://github.com/nganbuithii/mood-diary-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/nganbuithii/mood-diary-backend/actions/workflows/ci.yml)
 
+**Live API docs (Swagger):** https://mood-diary-backend-vdki.onrender.com/docs
+
 A backend API for a personal mood-journaling application, built with NestJS, PostgreSQL, and Prisma. This repository is a learning project: it is being built incrementally, with each phase focused on a specific set of backend engineering skills rather than shipping features as fast as possible.
 
 ## Table of Contents
@@ -398,7 +400,7 @@ For a direct SQL client (DBeaver, TablePlus, etc.), connect to `localhost:5432` 
 |---|---|---|---|---|
 | GET | `/health` | Liveness check — confirms the process is up | No | Implemented |
 
-Interactive, always-current API documentation (generated from the running application) is available at `/docs` once the backend is up.
+Interactive, always-current API documentation (generated from the running application) is available at `/docs` once the backend is up — locally at http://localhost:3001/docs, or on the deployed instance at https://mood-diary-backend-vdki.onrender.com/docs.
 
 **Planned** (will be documented here as each phase lands — see [Feature Roadmap](#feature-roadmap)):
 
