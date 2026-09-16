@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-// Only variables actually used by app code today. Add JWT/Redis vars here
-// when auth (Phase 1) / caching (Phase 7) start reading them — not before.
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
   DATABASE_URL: z.string().url(),
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
+  JWT_ACCESS_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(900),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
