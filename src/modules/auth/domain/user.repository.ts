@@ -15,6 +15,7 @@ export interface CreateUserInput {
 
 export interface UserRepository {
   findByEmail(email: string): Promise<UserEntity | null>;
+  findById(id: string): Promise<UserEntity | null>;
   create(input: CreateUserInput): Promise<UserEntity>;
 }
 

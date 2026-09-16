@@ -15,20 +15,26 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { RegisterUserUseCase } from '../application/register-user.use-case';
 import { LoginUserUseCase } from '../application/login-user.use-case';
+import { RefreshTokenUseCase } from '../application/refresh-token.use-case';
+import { LogoutUseCase } from '../application/logout.use-case';
 import { EmailAlreadyExistsError } from '../domain/email-already-exists.error';
 import { InvalidCredentialsError } from '../domain/invalid-credentials.error';
+import { InvalidRefreshTokenError } from '../domain/invalid-refresh-token.error';
 import { AccessTokenPayload } from '../domain/token-issuer';
 import { USER_REPOSITORY, UserRepository } from '../domain/user.repository';
 import { JwtAuthGuard } from '../infrastructure/jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RefreshResponseDto } from './dto/refresh-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
@@ -38,6 +44,8 @@ export class AuthController {
   constructor(
     private readonly registerUserUseCase: RegisterUserUseCase,
     private readonly loginUserUseCase: LoginUserUseCase,
+    private readonly refreshTokenUseCase: RefreshTokenUseCase,
+    private readonly logoutUseCase: LogoutUseCase,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
   ) {}
 
@@ -64,14 +72,37 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
   async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
     try {
-      const { accessToken, user } = await this.loginUserUseCase.execute(dto);
-      return LoginResponseDto.from(accessToken, user);
+      const { accessToken, refreshToken, user } = await this.loginUserUseCase.execute(dto);
+      return LoginResponseDto.from(accessToken, refreshToken, user);
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
         throw new UnauthorizedException('Invalid email or password');
       }
       throw error;
     }
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: 'New access + refresh token pair', type: RefreshResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid, expired or reused refresh token' })
+  async refresh(@Body() dto: RefreshTokenDto): Promise<RefreshResponseDto> {
+    try {
+      const { accessToken, refreshToken } = await this.refreshTokenUseCase.execute(dto);
+      return RefreshResponseDto.from(accessToken, refreshToken);
+    } catch (error) {
+      if (error instanceof InvalidRefreshTokenError) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+      throw error;
+    }
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Session revoked (idempotent even if the token was already invalid)' })
+  async logout(@Body() dto: RefreshTokenDto): Promise<void> {
+    await this.logoutUseCase.execute(dto);
   }
 
   @Get('me')
