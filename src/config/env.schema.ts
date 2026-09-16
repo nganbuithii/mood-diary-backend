@@ -11,6 +11,15 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(60 * 60 * 24 * 30),
+  CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:3000,https://mood-diary-frontend.vercel.app')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
