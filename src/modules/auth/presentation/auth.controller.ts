@@ -7,19 +7,23 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Req,
+  Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
-  ApiBearerAuth,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CookieOptions, Request, Response } from 'express';
 import { RegisterUserUseCase } from '../application/register-user.use-case';
 import { LoginUserUseCase } from '../application/login-user.use-case';
 import { RefreshTokenUseCase } from '../application/refresh-token.use-case';
@@ -29,12 +33,10 @@ import { InvalidCredentialsError } from '../domain/invalid-credentials.error';
 import { InvalidRefreshTokenError } from '../domain/invalid-refresh-token.error';
 import { AccessTokenPayload } from '../domain/token-issuer';
 import { USER_REPOSITORY, UserRepository } from '../domain/user.repository';
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE_PATH } from '../infrastructure/auth-cookies';
 import { JwtAuthGuard } from '../infrastructure/jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { LoginDto } from './dto/login.dto';
-import { LoginResponseDto } from './dto/login-response.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { RefreshResponseDto } from './dto/refresh-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
@@ -46,6 +48,7 @@ export class AuthController {
     private readonly loginUserUseCase: LoginUserUseCase,
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly configService: ConfigService,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
   ) {}
 
@@ -66,14 +69,18 @@ export class AuthController {
     }
   }
 
+  // Tokens are never returned in the body — they're set as httpOnly cookies
+  // so client-side JS (and anything it's tricked into running via XSS) can
+  // never read them. The FE only needs `credentials: 'include'` on requests.
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ description: 'Login successful', type: LoginResponseDto })
+  @ApiOkResponse({ description: 'Login successful — tokens set as httpOnly cookies', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
-  async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<UserResponseDto> {
     try {
       const { accessToken, refreshToken, user } = await this.loginUserUseCase.execute(dto);
-      return LoginResponseDto.from(accessToken, refreshToken, user);
+      this.setAuthCookies(res, accessToken, refreshToken);
+      return UserResponseDto.fromEntity(user);
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
         throw new UnauthorizedException('Invalid email or password');
@@ -83,15 +90,23 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ description: 'New access + refresh token pair', type: RefreshResponseDto })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'New access + refresh token pair set as httpOnly cookies' })
   @ApiUnauthorizedResponse({ description: 'Invalid, expired or reused refresh token' })
-  async refresh(@Body() dto: RefreshTokenDto): Promise<RefreshResponseDto> {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+    const presentedToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
+    if (!presentedToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+
     try {
-      const { accessToken, refreshToken } = await this.refreshTokenUseCase.execute(dto);
-      return RefreshResponseDto.from(accessToken, refreshToken);
+      const { accessToken, refreshToken } = await this.refreshTokenUseCase.execute({
+        refreshToken: presentedToken,
+      });
+      this.setAuthCookies(res, accessToken, refreshToken);
     } catch (error) {
       if (error instanceof InvalidRefreshTokenError) {
+        this.clearAuthCookies(res);
         throw new UnauthorizedException('Invalid or expired refresh token');
       }
       throw error;
@@ -101,13 +116,17 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'Session revoked (idempotent even if the token was already invalid)' })
-  async logout(@Body() dto: RefreshTokenDto): Promise<void> {
-    await this.logoutUseCase.execute(dto);
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+    const presentedToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
+    if (presentedToken) {
+      await this.logoutUseCase.execute({ refreshToken: presentedToken });
+    }
+    this.clearAuthCookies(res);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiCookieAuth(ACCESS_TOKEN_COOKIE)
   @ApiOkResponse({ description: 'Current authenticated user', type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing, invalid or expired access token' })
   async me(@CurrentUser() payload: AccessTokenPayload): Promise<UserResponseDto> {
@@ -116,5 +135,34 @@ export class AuthController {
       throw new UnauthorizedException('Invalid or expired access token');
     }
     return UserResponseDto.fromEntity(user);
+  }
+
+  private baseCookieOptions(): CookieOptions {
+    return {
+      httpOnly: true,
+      secure: this.configService.get<boolean>('COOKIE_SECURE', false),
+      sameSite: 'lax',
+    };
+  }
+
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+    const accessTtlSeconds = this.configService.get<number>('JWT_ACCESS_EXPIRES_IN_SECONDS', 900);
+    res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
+      ...this.baseCookieOptions(),
+      path: '/',
+      maxAge: accessTtlSeconds * 1000,
+    });
+
+    const refreshTtlSeconds = this.configService.get<number>('JWT_REFRESH_EXPIRES_IN_SECONDS', 60 * 60 * 24 * 30);
+    res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
+      ...this.baseCookieOptions(),
+      path: REFRESH_TOKEN_COOKIE_PATH,
+      maxAge: refreshTtlSeconds * 1000,
+    });
+  }
+
+  private clearAuthCookies(res: Response): void {
+    res.clearCookie(ACCESS_TOKEN_COOKIE, { ...this.baseCookieOptions(), path: '/' });
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { ...this.baseCookieOptions(), path: REFRESH_TOKEN_COOKIE_PATH });
   }
 }
