@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AccessTokenPayload } from '../domain/token-issuer';
+import { ACCESS_TOKEN_COOKIE } from './auth-cookies';
 
 export interface AuthenticatedRequest extends Request {
   user: AccessTokenPayload;
@@ -13,7 +14,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = this.extractTokenFromHeader(request);
+    const token = this.extractTokenFromCookie(request);
     if (!token) {
       throw new UnauthorizedException('Missing access token');
     }
@@ -27,8 +28,7 @@ export class JwtAuthGuard implements CanActivate {
     return true;
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+  private extractTokenFromCookie(request: Request): string | undefined {
+    return (request.cookies as Record<string, string | undefined> | undefined)?.[ACCESS_TOKEN_COOKIE];
   }
 }
