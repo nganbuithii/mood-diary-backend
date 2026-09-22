@@ -9,7 +9,7 @@ export class RegisterDto {
   @Length(1, 100, { message: 'displayName must be between 1 and 100 characters' })
   displayName: string;
 
-  @ApiProperty({ example: 'ngan@example.com' })
+  @ApiProperty({ example: 'test@example.com' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsEmail()
   email: string;

@@ -17,6 +17,7 @@ export interface UserRepository {
   findByEmail(email: string): Promise<UserEntity | null>;
   findById(id: string): Promise<UserEntity | null>;
   create(input: CreateUserInput): Promise<UserEntity>;
+  updatePassword(id: string, passwordHash: string): Promise<void>;
 }
 
 export const USER_REPOSITORY = Symbol('USER_REPOSITORY');

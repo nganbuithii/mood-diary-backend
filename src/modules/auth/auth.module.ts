@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { ChangePasswordUseCase } from './application/change-password.use-case';
 import { LoginUserUseCase } from './application/login-user.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
 import { RefreshTokenUseCase } from './application/refresh-token.use-case';
@@ -34,6 +35,7 @@ import { AuthController } from './presentation/auth.controller';
     LoginUserUseCase,
     RefreshTokenUseCase,
     LogoutUseCase,
+    ChangePasswordUseCase,
     JwtAuthGuard,
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },

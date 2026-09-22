@@ -27,6 +27,7 @@ export interface RefreshTokenRepository {
   revokeIfActive(id: string, replacedByTokenId: string): Promise<boolean>;
   revokeById(id: string): Promise<void>;
   revokeFamily(familyId: string): Promise<void>;
+  revokeAllForUser(userId: string): Promise<void>;
 }
 
 export const REFRESH_TOKEN_REPOSITORY = Symbol('REFRESH_TOKEN_REPOSITORY');
