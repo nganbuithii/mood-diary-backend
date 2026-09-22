@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ChangePasswordUseCase } from './application/change-password.use-case';
 import { ForgotPasswordUseCase } from './application/forgot-password.use-case';
 import { LoginUserUseCase } from './application/login-user.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
@@ -49,6 +50,7 @@ import { AuthController } from './presentation/auth.controller';
     LogoutUseCase,
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
+    ChangePasswordUseCase,
     JwtAuthGuard,
     ThrottlerGuard,
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },

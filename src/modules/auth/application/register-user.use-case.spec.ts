@@ -59,13 +59,13 @@ describe('RegisterUserUseCase', () => {
 
     const user = await useCase.execute({
       displayName: 'Ngân',
-      email: 'ngan@example.com',
+      email: 'test@example.com',
       password: 'plain-password',
     });
 
     expect(passwordHasher.hashCalls).toEqual(['plain-password']);
     expect(userRepository.createCalls).toEqual([
-      { email: 'ngan@example.com', displayName: 'Ngân', passwordHash: 'hashed:plain-password' },
+      { email: 'test@example.com', displayName: 'Ngân', passwordHash: 'hashed:plain-password' },
     ]);
     expect(user.passwordHash).toBe('hashed:plain-password');
   });
@@ -75,12 +75,12 @@ describe('RegisterUserUseCase', () => {
 
     await useCase.execute({
       displayName: '  Ngân  ',
-      email: '  Ngan@Example.com  ',
+      email: '  test@example.com  ',
       password: 'plain-password',
     });
 
     expect(userRepository.createCalls[0]).toMatchObject({
-      email: 'ngan@example.com',
+      email: 'test@example.com',
       displayName: 'Ngân',
     });
   });
@@ -88,7 +88,7 @@ describe('RegisterUserUseCase', () => {
   it('rejects registration when the email already exists', async () => {
     const existingUser: UserEntity = {
       id: 'existing-id',
-      email: 'ngan@example.com',
+      email: 'test@example.com',
       passwordHash: 'hashed:something',
       displayName: 'Ngân',
       createdAt: new Date(),
@@ -97,7 +97,7 @@ describe('RegisterUserUseCase', () => {
     const { useCase, userRepository, passwordHasher } = setup(existingUser);
 
     await expect(
-      useCase.execute({ displayName: 'Ngân', email: 'ngan@example.com', password: 'plain-password' }),
+      useCase.execute({ displayName: 'Ngân', email: 'test@example.com', password: 'plain-password' }),
     ).rejects.toThrow(EmailAlreadyExistsError);
 
     expect(passwordHasher.hashCalls).toHaveLength(0);

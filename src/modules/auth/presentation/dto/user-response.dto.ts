@@ -8,7 +8,7 @@ export class UserResponseDto {
   @ApiProperty({ example: 'Ngân' })
   displayName: string;
 
-  @ApiProperty({ example: 'ngan@example.com' })
+  @ApiProperty({ example: 'test@example.com' })
   email: string;
 
   @ApiProperty({ example: '2026-09-15T10:00:00.000Z' })

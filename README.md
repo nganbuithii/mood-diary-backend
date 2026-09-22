@@ -254,8 +254,11 @@ These are the principles this project is being built around — they describe in
 - [ ] Current user endpoint
 - [ ] Input validation (DTOs)
 - [ ] Duplicate email handling
+- [ ] Forgot password (emailed reset link, single-use token)
+- [ ] Reset password (via emailed token)
+- [ ] Change password (while logged in)
 
-Security topics to cover in this phase: password hashing, never storing raw refresh tokens (only `tokenHash`), token expiration, refresh-token reuse detection via `familyId`, and rate limiting on auth endpoints.
+Security topics to cover in this phase: password hashing, never storing raw refresh tokens (only `tokenHash`), token expiration, refresh-token reuse detection via `familyId`, and rate limiting on auth endpoints. Forgot/reset/change password all revoke every outstanding refresh token once the password changes, and the reset token itself is stored only as a hash (same pattern as `RefreshToken`).
 
 > The `User` and `RefreshToken` tables already exist (see [Database Design](#database-design)) — this phase is about the application logic on top of that schema, which does not exist yet.
 
@@ -411,6 +414,9 @@ Interactive, always-current API documentation (generated from the running applic
 | POST | `/auth/refresh` | Rotate a refresh token | Refresh token | Phase 1 |
 | POST | `/auth/logout` | Revoke the current token | Yes | Phase 1 |
 | GET | `/me` | Current authenticated user | Yes | Phase 1 |
+| POST | `/auth/forgot-password` | Request a password reset email (same response whether or not the email exists) | No | Phase 1 |
+| POST | `/auth/reset-password` | Reset password using the emailed single-use token | No | Phase 1 |
+| POST | `/auth/change-password` | Change password while logged in (requires current password) | Yes | Phase 1 |
 | POST | `/mood-entries` | Create today's mood entry | Yes | Phase 2 |
 | GET | `/mood-entries` | List mood history (paginated) | Yes | Phase 2 |
 | PATCH | `/mood-entries/:id` | Update a mood entry | Yes | Phase 2 |

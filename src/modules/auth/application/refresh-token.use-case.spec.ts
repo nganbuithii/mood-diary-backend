@@ -8,7 +8,7 @@ import { CreateRefreshTokenInput, RefreshTokenEntity, RefreshTokenRepository } f
 function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
   return {
     id: 'user-1',
-    email: 'ngan@example.com',
+    email: 'test@example.com',
     passwordHash: 'hashed:whatever',
     displayName: 'Ngân',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -141,7 +141,7 @@ describe('RefreshTokenUseCase', () => {
 
     expect(result.accessToken).toBe('access-for-user-1');
     expect(result.refreshToken).toBe('new-raw-token');
-    expect(tokenIssuer.issuedPayloads).toEqual([{ sub: 'user-1', email: 'ngan@example.com' }]);
+    expect(tokenIssuer.issuedPayloads).toEqual([{ sub: 'user-1', email: 'test@example.com' }]);
 
     expect(refreshTokenRepository.createCalls).toEqual([
       {

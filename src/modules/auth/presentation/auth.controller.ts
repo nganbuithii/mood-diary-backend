@@ -29,10 +29,12 @@ import { RegisterUserUseCase } from '../application/register-user.use-case';
 import { LoginUserUseCase } from '../application/login-user.use-case';
 import { RefreshTokenUseCase } from '../application/refresh-token.use-case';
 import { LogoutUseCase } from '../application/logout.use-case';
+import { ChangePasswordUseCase } from '../application/change-password.use-case';
 import { ForgotPasswordUseCase } from '../application/forgot-password.use-case';
 import { ResetPasswordUseCase } from '../application/reset-password.use-case';
 import { EmailAlreadyExistsError } from '../domain/email-already-exists.error';
 import { InvalidCredentialsError } from '../domain/invalid-credentials.error';
+import { InvalidCurrentPasswordError } from '../domain/invalid-current-password.error';
 import { InvalidRefreshTokenError } from '../domain/invalid-refresh-token.error';
 import { InvalidResetTokenError } from '../domain/invalid-reset-token.error';
 import { AccessTokenPayload } from '../domain/token-issuer';
@@ -40,6 +42,7 @@ import { USER_REPOSITORY, UserRepository } from '../domain/user.repository';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE_PATH } from '../infrastructure/auth-cookies';
 import { JwtAuthGuard } from '../infrastructure/jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -56,6 +59,7 @@ export class AuthController {
     private readonly logoutUseCase: LogoutUseCase,
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
+    private readonly changePasswordUseCase: ChangePasswordUseCase,
     private readonly configService: ConfigService,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
   ) {}
@@ -158,6 +162,32 @@ export class AuthController {
     } catch (error) {
       if (error instanceof InvalidResetTokenError) {
         throw new UnauthorizedException('Invalid or expired reset token');
+      }
+      throw error;
+    }
+  }
+
+  // Requires the current session (access token) — the caller must already be
+  // logged in and prove they know the current password. All refresh tokens
+  // are revoked afterwards so the new password is the only way to stay in.
+  @Post('change-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth(ACCESS_TOKEN_COOKIE)
+  @ApiNoContentResponse({ description: 'Password changed — all existing sessions are revoked' })
+  @ApiBadRequestResponse({ description: 'Invalid input' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token, or current password is wrong' })
+  async changePassword(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    try {
+      await this.changePasswordUseCase.execute({ userId: payload.sub, ...dto });
+      this.clearAuthCookies(res);
+    } catch (error) {
+      if (error instanceof InvalidCurrentPasswordError) {
+        throw new UnauthorizedException('Current password is incorrect');
       }
       throw error;
     }

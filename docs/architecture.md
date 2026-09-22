@@ -11,7 +11,7 @@ từng module**, không áp máy móc cho mọi module.
 
 | Module | Layering | Lý do |
 |---|---|---|
-| `auth` | Đầy đủ 4 layer (`domain/application/infrastructure/presentation`) + Command/Handler thủ công cho Register/Login/RefreshToken/Logout | Có business rule thật (refresh rotation, reuse detection, hashing) — đáng test độc lập |
+| `auth` | Đầy đủ 4 layer (`domain/application/infrastructure/presentation`) + Command/Handler thủ công cho Register/Login/RefreshToken/Logout/ForgotPassword/ResetPassword/ChangePassword | Có business rule thật (refresh rotation, reuse detection, hashing) — đáng test độc lập |
 | `users` | Đủ 4 layer, nhưng `application` chỉ là 1 Service class | CRUD profile/settings đơn giản, chưa có logic đáng cô lập |
 | `diaries` | Đầy đủ 4 layer + Command/Handler cho Create/Update/Delete, Query Service riêng cho đọc (timeline, get-by-id) | Module nghiệp vụ chính — transaction boundary (diary+tags), search/pagination |
 | `tags` | Như `users` | CRUD phẳng, không rule phức tạp |
@@ -94,7 +94,8 @@ Chưa tạo `Mood`/`Streak`/`Achievement` — thuộc phạm vi mở rộng sau.
   home, Docker Compose, Prisma schema, env validation, lint/test wiring.
 - **Phase 1** — Auth & Users (refresh rotation + reuse detection, ownership,
   forgot/reset password qua email — nodemailer SMTP, rate limit riêng cho 2
-  endpoint này qua `@nestjs/throttler`).
+  endpoint này qua `@nestjs/throttler`, change-password cho user đã login —
+  cả 2 luồng đổi mật khẩu đều revoke toàn bộ refresh token sau khi đổi).
 - **Phase 2** — Diary CRUD + Tags (cursor pagination, transaction boundary).
 - **Phase 3** — Database depth (composite index, `EXPLAIN ANALYZE`, N+1).
 - **Phase 4** — Security hardening (rate limit, helmet, CORS, brute-force).
