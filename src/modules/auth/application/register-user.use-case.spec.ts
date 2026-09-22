@@ -25,6 +25,10 @@ class FakeUserRepository implements UserRepository {
       ...input,
     });
   }
+
+  updatePassword(): Promise<void> {
+    throw new Error('not used in register tests');
+  }
 }
 
 class FakePasswordHasher implements PasswordHasher {

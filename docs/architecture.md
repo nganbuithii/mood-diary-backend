@@ -71,6 +71,7 @@ thật.
 ```
 User            (id, email UNIQUE, passwordHash, displayName, createdAt, updatedAt)
 RefreshToken    (id, userId FK, tokenHash, familyId, revokedAt?, replacedByTokenId?, expiresAt, createdAt)
+PasswordResetToken (id, userId FK, tokenHash UNIQUE, usedAt?, expiresAt, createdAt)
 DiaryEntry      (id, userId FK, title?, content, moodType enum, moodIntensity int, createdAt, updatedAt)
 Tag             (id, userId FK, name, createdAt)
 DiaryTag        (diaryId FK, tagId FK)   -- composite PK, bảng nối
@@ -80,6 +81,7 @@ DiaryTag        (diaryId FK, tagId FK)   -- composite PK, bảng nối
 |---|---|
 | `User.email` UNIQUE | Chặn duplicate account ở DB (race condition khi 2 request đăng ký cùng lúc) |
 | `RefreshToken(familyId)` index | Reuse detection cần revoke nhanh toàn bộ family |
+| `PasswordResetToken.tokenHash` UNIQUE | Chỉ lưu hash (SHA-256) của reset token, không lưu raw — giống `RefreshToken` |
 | `DiaryTag(diaryId, tagId)` composite PK | Chặn gắn trùng tag ở tầng DB |
 | `DiaryEntry(userId, createdAt DESC)` composite index | Phục vụ query timeline cursor-paginated |
 | `Tag(userId, name)` UNIQUE | Chặn user tạo trùng tên tag |
@@ -90,7 +92,9 @@ Chưa tạo `Mood`/`Streak`/`Achievement` — thuộc phạm vi mở rộng sau.
 
 - **Phase 0 — Init** (đã xong): skeleton monorepo, `GET /health`, Next.js
   home, Docker Compose, Prisma schema, env validation, lint/test wiring.
-- **Phase 1** — Auth & Users (refresh rotation + reuse detection, ownership).
+- **Phase 1** — Auth & Users (refresh rotation + reuse detection, ownership,
+  forgot/reset password qua email — nodemailer SMTP, rate limit riêng cho 2
+  endpoint này qua `@nestjs/throttler`).
 - **Phase 2** — Diary CRUD + Tags (cursor pagination, transaction boundary).
 - **Phase 3** — Database depth (composite index, `EXPLAIN ANALYZE`, N+1).
 - **Phase 4** — Security hardening (rate limit, helmet, CORS, brute-force).

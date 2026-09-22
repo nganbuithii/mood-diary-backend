@@ -32,6 +32,10 @@ class FakeUserRepository implements UserRepository {
   create(): Promise<UserEntity> {
     throw new Error('not used in login tests');
   }
+
+  updatePassword(): Promise<void> {
+    throw new Error('not used in login tests');
+  }
 }
 
 class FakePasswordHasher implements PasswordHasher {
@@ -102,6 +106,10 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
   }
 
   revokeFamily(): Promise<void> {
+    throw new Error('not used in login tests');
+  }
+
+  revokeAllForUser(): Promise<void> {
     throw new Error('not used in login tests');
   }
 }

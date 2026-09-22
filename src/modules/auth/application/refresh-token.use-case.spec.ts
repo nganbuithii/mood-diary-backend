@@ -45,6 +45,10 @@ class FakeUserRepository implements UserRepository {
   create(): Promise<UserEntity> {
     throw new Error('not used in refresh tests');
   }
+
+  updatePassword(): Promise<void> {
+    throw new Error('not used in refresh tests');
+  }
 }
 
 class FakeTokenIssuer implements TokenIssuer {
@@ -108,6 +112,10 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
   revokeFamily(familyId: string): Promise<void> {
     this.revokeFamilyCalls.push(familyId);
     return Promise.resolve();
+  }
+
+  revokeAllForUser(): Promise<void> {
+    throw new Error('not used in refresh tests');
   }
 }
 
