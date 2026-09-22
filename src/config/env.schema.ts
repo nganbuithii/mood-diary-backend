@@ -14,12 +14,17 @@ export const envSchema = z.object({
 
   PASSWORD_RESET_TOKEN_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(900),
   FRONTEND_RESET_PASSWORD_URL: z.string().url().default('http://localhost:3000/reset-password'),
+  
   MAIL_FROM: z.string().default('no-reply@mood-diary.app'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   
+  CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
+  CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
+  CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
+
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:3000,https://mood-diary-frontend.vercel.app')
