@@ -9,7 +9,7 @@ import { CreateRefreshTokenInput, RefreshTokenEntity, RefreshTokenRepository } f
 function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
   return {
     id: 'user-1',
-    email: 'ngan@example.com',
+    email: 'test@example.com',
     passwordHash: 'hashed:correct-password',
     displayName: 'Ngân',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -30,6 +30,10 @@ class FakeUserRepository implements UserRepository {
   }
 
   create(): Promise<UserEntity> {
+    throw new Error('not used in login tests');
+  }
+
+  updatePassword(): Promise<void> {
     throw new Error('not used in login tests');
   }
 }
@@ -104,6 +108,10 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
   revokeFamily(): Promise<void> {
     throw new Error('not used in login tests');
   }
+
+  revokeAllForUser(): Promise<void> {
+    throw new Error('not used in login tests');
+  }
 }
 
 describe('LoginUserUseCase', () => {
@@ -157,10 +165,10 @@ describe('LoginUserUseCase', () => {
   });
 
   it('normalizes email (trim + lowercase) before lookup', async () => {
-    const user = buildUser({ email: 'ngan@example.com' });
+    const user = buildUser({ email: 'test@example.com' });
     const { useCase } = setup(user);
 
-    const result = await useCase.execute({ email: '  Ngan@Example.com  ', password: correctPassword });
+    const result = await useCase.execute({ email: '  test@example.com  ', password: correctPassword });
 
     expect(result.user).toEqual(user);
   });

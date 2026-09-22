@@ -51,6 +51,10 @@ class FakeRefreshTokenRepository implements RefreshTokenRepository {
     this.revokeFamilyCalls.push(familyId);
     return Promise.resolve();
   }
+
+  revokeAllForUser(): Promise<void> {
+    throw new Error('not used in logout tests');
+  }
 }
 
 describe('LogoutUseCase', () => {
