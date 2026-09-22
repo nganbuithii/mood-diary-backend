@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl python3 make g++
+RUN apk add --no-cache openssl python3 py3-setuptools make g++
 
 RUN corepack enable && corepack prepare pnpm@10.18.1 --activate
 
