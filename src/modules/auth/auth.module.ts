@@ -62,6 +62,6 @@ import { AuthController } from './presentation/auth.controller';
     { provide: PASSWORD_RESET_TOKEN_REPOSITORY, useClass: PrismaPasswordResetTokenRepository },
     { provide: MAIL_SENDER, useClass: NodemailerMailSender },
   ],
-  exports: [JwtAuthGuard],
+  exports: [JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

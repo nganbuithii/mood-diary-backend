@@ -1,8 +1,9 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl python3 py3-setuptools make g++
+RUN apt-get update && apt-get install -y --no-install-recommends openssl python3 build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@10.18.1 --activate
 
