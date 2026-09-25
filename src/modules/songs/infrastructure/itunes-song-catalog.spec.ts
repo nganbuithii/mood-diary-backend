@@ -19,10 +19,32 @@ function mockFetch(response: { ok: boolean; status?: number; body?: unknown }) {
   } as Response);
 }
 
+function jsonResponse(body: unknown) {
+  return { ok: true, status: 200, json: () => Promise.resolve(body) } as Response;
+}
+
 describe('ItunesSongCatalog', () => {
   const catalog = new ItunesSongCatalog();
 
   afterEach(() => jest.restoreAllMocks());
+
+  it('returns trending songs in chart order and caches them', async () => {
+    const trendingCatalog = new ItunesSongCatalog();
+    const secondTrack = { ...SUNFLOWER_TRACK, trackId: 222, trackName: 'Second' };
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      // Chart feed: 222 ranks above 1445931937.
+      .mockResolvedValueOnce(jsonResponse({ feed: { results: [{ id: '222' }, { id: '1445931937' }] } }))
+      // Lookup returns them in a different order.
+      .mockResolvedValueOnce(jsonResponse({ results: [SUNFLOWER_TRACK, secondTrack] }));
+
+    const first = await trendingCatalog.trending();
+    const second = await trendingCatalog.trending();
+
+    expect(first.map((song) => song.id)).toEqual(['222', '1445931937']);
+    expect(second).toBe(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 
   it('maps song tracks and skips non-song rows', async () => {
     mockFetch({

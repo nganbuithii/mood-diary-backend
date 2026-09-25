@@ -9,6 +9,7 @@ export interface Song {
 export interface SongCatalog {
   search(query: string, limit: number): Promise<Song[]>;
   findById(id: string): Promise<Song | null>;
+  trending(): Promise<Song[]>;
 }
 
 export const SONG_CATALOG = Symbol('SONG_CATALOG');

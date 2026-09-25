@@ -83,6 +83,10 @@ class FakeSongCatalog implements SongCatalog {
   findById(id: string): Promise<Song | null> {
     return Promise.resolve(this.songs.find((song) => song.id === id) ?? null);
   }
+
+  trending(): Promise<Song[]> {
+    return Promise.resolve(this.songs);
+  }
 }
 
 describe('DiariesService', () => {

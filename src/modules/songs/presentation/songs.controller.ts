@@ -25,6 +25,22 @@ const SEARCH_RESULT_LIMIT = 10;
 export class SongsController {
   constructor(@Inject(SONG_CATALOG) private readonly songCatalog: SongCatalog) {}
 
+  @Get('trending')
+  @ApiOkResponse({ description: 'Most-played songs in Vietnam right now, in chart order (up to 20)', type: [SongResponseDto] })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  @ApiBadGatewayResponse({ description: 'Song catalog is unavailable' })
+  async trending(): Promise<SongResponseDto[]> {
+    try {
+      const songs = await this.songCatalog.trending();
+      return songs.map((song) => SongResponseDto.fromSong(song));
+    } catch (error) {
+      if (error instanceof SongCatalogUnavailableError) {
+        throw new BadGatewayException('Trending songs are unavailable right now. Please try again.');
+      }
+      throw error;
+    }
+  }
+
   @Get('search')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
