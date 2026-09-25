@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput } from '../domain/diary-entry.repository';
+import { Song } from '../../songs/domain/song-catalog';
 
 const PRISMA_UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 
@@ -32,8 +33,14 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
         mood: input.mood,
         note: input.note,
         photoUrls: input.photoUrls ?? [],
+        ...toSongColumns(input.song),
       },
-      update: { mood: input.mood, note: input.note, photoUrls: input.photoUrls },
+      update: {
+        mood: input.mood,
+        note: input.note,
+        photoUrls: input.photoUrls,
+        ...toSongColumns(input.song),
+      },
     });
   }
 
@@ -43,4 +50,15 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
       orderBy: { entryDate: 'asc' },
     });
   }
+}
+
+function toSongColumns(song: Song | null | undefined) {
+  if (song === undefined) return {};
+  return {
+    songExternalId: song?.id ?? null,
+    songTitle: song?.title ?? null,
+    songArtist: song?.artist ?? null,
+    songArtworkUrl: song?.artworkUrl ?? null,
+    songPreviewUrl: song?.previewUrl ?? null,
+  };
 }

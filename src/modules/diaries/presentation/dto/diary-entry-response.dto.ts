@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { DIARY_MOODS, DiaryEntryEntity, DiaryMood } from '../../domain/diary-entry.repository';
+import { SongResponseDto } from '../../../songs/presentation/dto/song-response.dto';
 
 export class DiaryEntryResponseDto {
   @ApiProperty({ example: 'b3f1c2a0-1234-4a5b-8c9d-0e1f2a3b4c5d' })
@@ -17,6 +18,9 @@ export class DiaryEntryResponseDto {
   @ApiProperty({ type: [String], example: ['https://res.cloudinary.com/demo/image/upload/v1/mood-diary/diary-photos/user-1/abc.jpg'] })
   photoUrls: string[];
 
+  @ApiProperty({ type: SongResponseDto, nullable: true })
+  song: SongResponseDto | null;
+
   @ApiProperty({ example: '2026-09-25T10:00:00.000Z' })
   createdAt: Date;
 
@@ -30,14 +34,22 @@ export class DiaryEntryResponseDto {
     dto.mood = entry.mood;
     dto.note = entry.note;
     dto.photoUrls = entry.photoUrls;
+    dto.song =
+      entry.songExternalId && entry.songTitle && entry.songArtist
+        ? SongResponseDto.fromSong({
+            id: entry.songExternalId,
+            title: entry.songTitle,
+            artist: entry.songArtist,
+            artworkUrl: entry.songArtworkUrl,
+            previewUrl: entry.songPreviewUrl,
+          })
+        : null;
     dto.createdAt = entry.createdAt;
     dto.updatedAt = entry.updatedAt;
     return dto;
   }
 }
 
-// entryDate is stored as UTC midnight (Prisma `@db.Date`) — read it back with
-// UTC getters so the server's local timezone can never shift the calendar day.
 function toDateKey(date: Date): string {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');

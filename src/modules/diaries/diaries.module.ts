@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { SongsModule } from '../songs/songs.module';
 import { DiariesService } from './application/diaries.service';
 import { DIARY_ENTRY_REPOSITORY } from './domain/diary-entry.repository';
 import { DIARY_PHOTO_STORAGE } from './domain/diary-photo-storage';
@@ -8,7 +9,7 @@ import { PrismaDiaryEntryRepository } from './infrastructure/prisma-diary-entry.
 import { DiariesController } from './presentation/diaries.controller';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SongsModule],
   controllers: [DiariesController],
   providers: [
     DiariesService,
