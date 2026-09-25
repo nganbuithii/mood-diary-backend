@@ -1,5 +1,6 @@
 import { DiariesService } from './diaries.service';
 import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput } from '../domain/diary-entry.repository';
+import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 
 function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity {
@@ -8,6 +9,7 @@ function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity
     userId: 'user-1',
     mood: 'HAPPY',
     note: null,
+    photoUrls: [],
     entryDate: new Date('2026-09-25T00:00:00.000Z'),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -36,11 +38,21 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   }
 }
 
+class FakeDiaryPhotoStorage implements DiaryPhotoStorage {
+  public uploadCalls: Array<{ userId: string; file: Buffer }> = [];
+
+  upload(userId: string, file: Buffer): Promise<DiaryPhotoUploadResult> {
+    this.uploadCalls.push({ userId, file });
+    return Promise.resolve({ url: `https://cdn.test/${userId}/${this.uploadCalls.length}.jpg` });
+  }
+}
+
 describe('DiariesService', () => {
   function setup(entries: DiaryEntryEntity[] = []) {
     const diaryEntryRepository = new FakeDiaryEntryRepository(entries);
-    const service = new DiariesService(diaryEntryRepository);
-    return { service, diaryEntryRepository };
+    const diaryPhotoStorage = new FakeDiaryPhotoStorage();
+    const service = new DiariesService(diaryEntryRepository, diaryPhotoStorage);
+    return { service, diaryEntryRepository, diaryPhotoStorage };
   }
 
   describe('upsertEntry', () => {
@@ -55,7 +67,13 @@ describe('DiariesService', () => {
       });
 
       expect(diaryEntryRepository.upsertCalls).toEqual([
-        { userId: 'user-1', entryDate: new Date('2026-09-25T00:00:00.000Z'), mood: 'HAPPY', note: 'Great day' },
+        {
+          userId: 'user-1',
+          entryDate: new Date('2026-09-25T00:00:00.000Z'),
+          mood: 'HAPPY',
+          note: 'Great day',
+          photoUrls: [],
+        },
       ]);
       expect(entry.note).toBe('Great day');
     });
@@ -69,12 +87,50 @@ describe('DiariesService', () => {
     });
 
     it('rejects a shape-valid but nonexistent calendar date', async () => {
-      const { service, diaryEntryRepository } = setup();
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
 
       await expect(
-        service.upsertEntry({ userId: 'user-1', date: '2026-02-30', mood: 'HAPPY' }),
+        service.upsertEntry({
+          userId: 'user-1',
+          date: '2026-02-30',
+          mood: 'HAPPY',
+          photos: [Buffer.from('x')],
+        }),
       ).rejects.toThrow(InvalidEntryDateError);
       expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
+    });
+
+    it('uploads each photo and stores the resulting URLs', async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
+
+      const entry = await service.upsertEntry({
+        userId: 'user-1',
+        date: '2026-09-25',
+        mood: 'HAPPY',
+        photos: [Buffer.from('a'), Buffer.from('b')],
+      });
+
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(2);
+      expect(diaryEntryRepository.upsertCalls[0].photoUrls).toEqual([
+        'https://cdn.test/user-1/1.jpg',
+        'https://cdn.test/user-1/2.jpg',
+      ]);
+      expect(entry.photoUrls).toHaveLength(2);
+    });
+
+    it('caps uploads at MAX_ENTRY_PHOTOS even if more files are sent', async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
+
+      await service.upsertEntry({
+        userId: 'user-1',
+        date: '2026-09-25',
+        mood: 'HAPPY',
+        photos: [Buffer.from('a'), Buffer.from('b'), Buffer.from('c'), Buffer.from('d')],
+      });
+
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(3);
+      expect(diaryEntryRepository.upsertCalls[0].photoUrls).toHaveLength(3);
     });
   });
 

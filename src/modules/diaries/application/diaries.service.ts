@@ -4,7 +4,9 @@ import {
   DiaryEntryEntity,
   DiaryEntryRepository,
   DiaryMood,
+  MAX_ENTRY_PHOTOS,
 } from '../domain/diary-entry.repository';
+import { DIARY_PHOTO_STORAGE, DiaryPhotoStorage } from '../domain/diary-photo-storage';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 
 export interface UpsertDiaryEntryRequest {
@@ -12,20 +14,32 @@ export interface UpsertDiaryEntryRequest {
   date: string;
   mood: DiaryMood;
   note?: string | null;
+  photos?: Buffer[];
 }
 
 @Injectable()
 export class DiariesService {
-  constructor(@Inject(DIARY_ENTRY_REPOSITORY) private readonly diaryEntryRepository: DiaryEntryRepository) {}
+  constructor(
+    @Inject(DIARY_ENTRY_REPOSITORY) private readonly diaryEntryRepository: DiaryEntryRepository,
+    @Inject(DIARY_PHOTO_STORAGE) private readonly diaryPhotoStorage: DiaryPhotoStorage,
+  ) {}
 
   async upsertEntry(input: UpsertDiaryEntryRequest): Promise<DiaryEntryEntity> {
+    // Validate before uploading: an invalid date shouldn't cost a wasted
+    // (and orphaned) Cloudinary upload.
+    const entryDate = parseCalendarDate(input.date);
     const note = input.note?.trim();
+    const photoFiles = (input.photos ?? []).slice(0, MAX_ENTRY_PHOTOS);
+    const photoUrls = await Promise.all(
+      photoFiles.map((file) => this.diaryPhotoStorage.upload(input.userId, file).then((result) => result.url)),
+    );
 
     return this.diaryEntryRepository.upsert({
       userId: input.userId,
-      entryDate: parseCalendarDate(input.date),
+      entryDate,
       mood: input.mood,
       note: note ? note : null,
+      photoUrls,
     });
   }
 

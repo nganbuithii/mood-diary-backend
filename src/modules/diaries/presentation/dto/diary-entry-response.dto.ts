@@ -14,6 +14,9 @@ export class DiaryEntryResponseDto {
   @ApiProperty({ nullable: true, example: 'Coffee with an old friend, felt so nice.' })
   note: string | null;
 
+  @ApiProperty({ type: [String], example: ['https://res.cloudinary.com/demo/image/upload/v1/mood-diary/diary-photos/user-1/abc.jpg'] })
+  photoUrls: string[];
+
   @ApiProperty({ example: '2026-09-25T10:00:00.000Z' })
   createdAt: Date;
 
@@ -26,6 +29,7 @@ export class DiaryEntryResponseDto {
     dto.date = toDateKey(entry.entryDate);
     dto.mood = entry.mood;
     dto.note = entry.note;
+    dto.photoUrls = entry.photoUrls;
     dto.createdAt = entry.createdAt;
     dto.updatedAt = entry.updatedAt;
     return dto;

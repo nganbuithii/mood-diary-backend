@@ -26,8 +26,14 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
   private runUpsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity> {
     return this.prisma.moodEntry.upsert({
       where: { userId_entryDate: { userId: input.userId, entryDate: input.entryDate } },
-      create: { userId: input.userId, entryDate: input.entryDate, mood: input.mood, note: input.note },
-      update: { mood: input.mood, note: input.note },
+      create: {
+        userId: input.userId,
+        entryDate: input.entryDate,
+        mood: input.mood,
+        note: input.note,
+        photoUrls: input.photoUrls,
+      },
+      update: { mood: input.mood, note: input.note, photoUrls: input.photoUrls },
     });
   }
 

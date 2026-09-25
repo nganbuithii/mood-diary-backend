@@ -68,6 +68,7 @@ model MoodEntry {
   userId    String
   mood      Mood
   note      String?
+  photoUrls String[] @default([])
   entryDate DateTime @db.Date
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

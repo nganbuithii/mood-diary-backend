@@ -2,11 +2,14 @@ export const DIARY_MOODS = ['VERY_SAD', 'SAD', 'NEUTRAL', 'HAPPY', 'VERY_HAPPY']
 
 export type DiaryMood = (typeof DIARY_MOODS)[number];
 
+export const MAX_ENTRY_PHOTOS = 3;
+
 export interface DiaryEntryEntity {
   id: string;
   userId: string;
   mood: DiaryMood;
   note: string | null;
+  photoUrls: string[];
   entryDate: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -17,6 +20,7 @@ export interface UpsertDiaryEntryInput {
   entryDate: Date;
   mood: DiaryMood;
   note: string | null;
+  photoUrls: string[];
 }
 
 export interface DiaryEntryRepository {
