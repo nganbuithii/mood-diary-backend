@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   Controller,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
@@ -31,6 +33,8 @@ import { DiariesService } from '../application/diaries.service';
 import { MAX_ENTRY_PHOTOS } from '../domain/diary-entry.repository';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
+import { SongNotFoundError } from '../domain/song-not-found.error';
+import { SongCatalogUnavailableError } from '../../songs/domain/song-catalog-unavailable.error';
 import { DiaryEntryResponseDto } from './dto/diary-entry-response.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
 import { UpsertDiaryEntryDto } from './dto/upsert-diary-entry.dto';
@@ -68,11 +72,17 @@ export class DiariesController {
         mood: { type: 'string', example: 'HAPPY' },
         note: { type: 'string' },
         photos: { type: 'array', items: { type: 'string', format: 'binary' }, maxItems: MAX_ENTRY_PHOTOS },
+        songId: {
+          type: 'string',
+          example: '1445931937',
+          description: 'Song id from GET /songs/search. Omit to keep the current song, empty string to remove it.',
+        },
       },
     },
   })
   @ApiOkResponse({ description: 'Entry created or updated for that date', type: DiaryEntryResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid date, mood, note or photo' })
+  @ApiBadRequestResponse({ description: 'Invalid date, mood, note, photo or song' })
+  @ApiBadGatewayResponse({ description: 'Song catalog is unavailable' })
   @ApiPayloadTooLargeResponse({ description: 'A photo exceeds 5MB' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
   async upsert(
@@ -87,11 +97,18 @@ export class DiariesController {
         mood: dto.mood,
         note: dto.note,
         photos: photos.map((file) => file.buffer),
+        songId: dto.songId,
       });
       return DiaryEntryResponseDto.fromEntity(entry);
     } catch (error) {
       if (error instanceof InvalidEntryDateError) {
         throw new BadRequestException(error.message);
+      }
+      if (error instanceof SongNotFoundError) {
+        throw new BadRequestException('Song not found');
+      }
+      if (error instanceof SongCatalogUnavailableError) {
+        throw new BadGatewayException("Couldn't reach the song catalog. Please try again.");
       }
       if (error instanceof InvalidDiaryPhotoError) {
         throw new BadRequestException('One of the photos is not a valid image file');

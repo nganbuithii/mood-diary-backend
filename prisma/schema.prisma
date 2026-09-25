@@ -64,14 +64,20 @@ model PasswordResetToken {
 }
 
 model MoodEntry {
-  id        String   @id @default(uuid())
-  userId    String
-  mood      Mood
-  note      String?
-  photoUrls String[] @default([])
-  entryDate DateTime @db.Date
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String
+  mood           Mood
+  note           String?
+  photoUrls      String[] @default([])
+  // Snapshot of the chosen song, so the entry survives the song being pulled from the catalog.
+  songExternalId String?
+  songTitle      String?
+  songArtist     String?
+  songArtworkUrl String?
+  songPreviewUrl String?
+  entryDate      DateTime @db.Date
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, entryDate])

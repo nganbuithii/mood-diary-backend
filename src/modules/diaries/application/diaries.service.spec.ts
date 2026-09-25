@@ -2,6 +2,16 @@ import { DiariesService } from './diaries.service';
 import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput } from '../domain/diary-entry.repository';
 import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
+import { SongNotFoundError } from '../domain/song-not-found.error';
+import { Song, SongCatalog } from '../../songs/domain/song-catalog';
+
+const SUNFLOWER: Song = {
+  id: '1445931937',
+  title: 'Sunflower',
+  artist: 'Post Malone & Swae Lee',
+  artworkUrl: 'https://cdn.test/sunflower.jpg',
+  previewUrl: 'https://cdn.test/sunflower.m4a',
+};
 
 function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity {
   return {
@@ -10,6 +20,11 @@ function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity
     mood: 'HAPPY',
     note: null,
     photoUrls: [],
+    songExternalId: null,
+    songTitle: null,
+    songArtist: null,
+    songArtworkUrl: null,
+    songPreviewUrl: null,
     entryDate: new Date('2026-09-25T00:00:00.000Z'),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -25,7 +40,18 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
 
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity> {
     this.upsertCalls.push(input);
-    return Promise.resolve(buildEntry({ ...input, photoUrls: input.photoUrls ?? [] }));
+    const { song, photoUrls, ...rest } = input;
+    return Promise.resolve(
+      buildEntry({
+        ...rest,
+        photoUrls: photoUrls ?? [],
+        songExternalId: song?.id ?? null,
+        songTitle: song?.title ?? null,
+        songArtist: song?.artist ?? null,
+        songArtworkUrl: song?.artworkUrl ?? null,
+        songPreviewUrl: song?.previewUrl ?? null,
+      }),
+    );
   }
 
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]> {
@@ -47,11 +73,23 @@ class FakeDiaryPhotoStorage implements DiaryPhotoStorage {
   }
 }
 
+class FakeSongCatalog implements SongCatalog {
+  constructor(private readonly songs: Song[] = [SUNFLOWER]) {}
+
+  search(query: string): Promise<Song[]> {
+    return Promise.resolve(this.songs.filter((song) => song.title.includes(query)));
+  }
+
+  findById(id: string): Promise<Song | null> {
+    return Promise.resolve(this.songs.find((song) => song.id === id) ?? null);
+  }
+}
+
 describe('DiariesService', () => {
   function setup(entries: DiaryEntryEntity[] = []) {
     const diaryEntryRepository = new FakeDiaryEntryRepository(entries);
     const diaryPhotoStorage = new FakeDiaryPhotoStorage();
-    const service = new DiariesService(diaryEntryRepository, diaryPhotoStorage);
+    const service = new DiariesService(diaryEntryRepository, diaryPhotoStorage, new FakeSongCatalog());
     return { service, diaryEntryRepository, diaryPhotoStorage };
   }
 
@@ -140,6 +178,52 @@ describe('DiariesService', () => {
 
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(3);
       expect(diaryEntryRepository.upsertCalls[0].photoUrls).toHaveLength(3);
+    });
+
+    it('leaves the current song untouched when no songId is sent', async () => {
+      const { service, diaryEntryRepository } = setup();
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY' });
+
+      expect(diaryEntryRepository.upsertCalls[0].song).toBeUndefined();
+    });
+
+    it('clears the song when songId is an empty string', async () => {
+      const { service, diaryEntryRepository } = setup();
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', songId: '' });
+
+      expect(diaryEntryRepository.upsertCalls[0].song).toBeNull();
+    });
+
+    it('stores a snapshot of the song looked up from the catalog', async () => {
+      const { service, diaryEntryRepository } = setup();
+
+      const entry = await service.upsertEntry({
+        userId: 'user-1',
+        date: '2026-09-25',
+        mood: 'HAPPY',
+        songId: SUNFLOWER.id,
+      });
+
+      expect(diaryEntryRepository.upsertCalls[0].song).toEqual(SUNFLOWER);
+      expect(entry.songTitle).toBe('Sunflower');
+    });
+
+    it('rejects an unknown songId before uploading any photo', async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
+
+      await expect(
+        service.upsertEntry({
+          userId: 'user-1',
+          date: '2026-09-25',
+          mood: 'HAPPY',
+          songId: '999',
+          photos: [Buffer.from('a')],
+        }),
+      ).rejects.toThrow(SongNotFoundError);
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
+      expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
     });
   });
 

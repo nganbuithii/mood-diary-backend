@@ -16,4 +16,15 @@ export class UpsertDiaryEntryDto {
   @IsString()
   @MaxLength(2000)
   note?: string;
+
+  @ApiProperty({
+    required: false,
+    maxLength: 32,
+    example: '1445931937',
+    description: 'Song id from GET /songs/search. Omit to keep the current song, send an empty string to remove it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  songId?: string;
 }
