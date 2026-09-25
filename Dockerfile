@@ -16,4 +16,5 @@ COPY . .
 
 EXPOSE 3001
 
-CMD ["pnpm", "run", "start:dev"]
+
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && pnpm run start:dev"]
