@@ -31,7 +31,7 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
         entryDate: input.entryDate,
         mood: input.mood,
         note: input.note,
-        photoUrls: input.photoUrls,
+        photoUrls: input.photoUrls ?? [],
       },
       update: { mood: input.mood, note: input.note, photoUrls: input.photoUrls },
     });

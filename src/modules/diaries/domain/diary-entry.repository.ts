@@ -20,7 +20,8 @@ export interface UpsertDiaryEntryInput {
   entryDate: Date;
   mood: DiaryMood;
   note: string | null;
-  photoUrls: string[];
+  /** Omitted: an existing entry keeps its photos; a new entry starts with none. */
+  photoUrls?: string[];
 }
 
 export interface DiaryEntryRepository {

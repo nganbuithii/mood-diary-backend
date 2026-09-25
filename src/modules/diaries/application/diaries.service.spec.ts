@@ -25,7 +25,7 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
 
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity> {
     this.upsertCalls.push(input);
-    return Promise.resolve(buildEntry(input));
+    return Promise.resolve(buildEntry({ ...input, photoUrls: input.photoUrls ?? [] }));
   }
 
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]> {
@@ -72,7 +72,7 @@ describe('DiariesService', () => {
           entryDate: new Date('2026-09-25T00:00:00.000Z'),
           mood: 'HAPPY',
           note: 'Great day',
-          photoUrls: [],
+          photoUrls: undefined,
         },
       ]);
       expect(entry.note).toBe('Great day');
@@ -117,6 +117,15 @@ describe('DiariesService', () => {
         'https://cdn.test/user-1/2.jpg',
       ]);
       expect(entry.photoUrls).toHaveLength(2);
+    });
+
+    it('leaves existing photos untouched when no photos are sent', async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', photos: [] });
+
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
+      expect(diaryEntryRepository.upsertCalls[0].photoUrls).toBeUndefined();
     });
 
     it('caps uploads at MAX_ENTRY_PHOTOS even if more files are sent', async () => {

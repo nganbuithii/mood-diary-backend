@@ -25,14 +25,15 @@ export class DiariesService {
   ) {}
 
   async upsertEntry(input: UpsertDiaryEntryRequest): Promise<DiaryEntryEntity> {
-    // Validate before uploading: an invalid date shouldn't cost a wasted
-    // (and orphaned) Cloudinary upload.
     const entryDate = parseCalendarDate(input.date);
     const note = input.note?.trim();
     const photoFiles = (input.photos ?? []).slice(0, MAX_ENTRY_PHOTOS);
-    const photoUrls = await Promise.all(
-      photoFiles.map((file) => this.diaryPhotoStorage.upload(input.userId, file).then((result) => result.url)),
-    );
+    const photoUrls =
+      photoFiles.length > 0
+        ? await Promise.all(
+            photoFiles.map((file) => this.diaryPhotoStorage.upload(input.userId, file).then((result) => result.url)),
+          )
+        : undefined;
 
     return this.diaryEntryRepository.upsert({
       userId: input.userId,
