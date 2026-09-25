@@ -14,12 +14,19 @@ export class UserResponseDto {
   @ApiProperty({ example: '2026-09-15T10:00:00.000Z' })
   createdAt: Date;
 
+  @ApiProperty({
+    example: 'https://res.cloudinary.com/demo/image/upload/v1/mood-diary/avatars/user-1.jpg',
+    nullable: true,
+  })
+  avatarUrl: string | null;
+
   static fromEntity(user: UserEntity): UserResponseDto {
     const dto = new UserResponseDto();
     dto.id = user.id;
     dto.displayName = user.displayName;
     dto.email = user.email;
     dto.createdAt = user.createdAt;
+    dto.avatarUrl = user.avatarUrl ?? null;
     return dto;
   }
 }

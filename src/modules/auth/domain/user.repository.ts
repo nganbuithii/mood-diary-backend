@@ -3,6 +3,7 @@ export interface UserEntity {
   email: string;
   passwordHash: string;
   displayName: string;
+  avatarUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
