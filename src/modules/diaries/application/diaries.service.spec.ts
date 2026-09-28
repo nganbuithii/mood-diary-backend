@@ -62,6 +62,18 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
       ),
     );
   }
+
+  findByUserAndDate(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  countByUserOnOrBefore(): Promise<number> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  findByUserOnOrBeforeAt(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in DiariesService tests');
+  }
 }
 
 class FakeDiaryPhotoStorage implements DiaryPhotoStorage {

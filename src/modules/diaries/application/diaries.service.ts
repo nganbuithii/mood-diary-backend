@@ -7,8 +7,8 @@ import {
   MAX_ENTRY_PHOTOS,
 } from '../domain/diary-entry.repository';
 import { DIARY_PHOTO_STORAGE, DiaryPhotoStorage } from '../domain/diary-photo-storage';
-import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
+import { parseCalendarDate } from './calendar-date';
 import { SONG_CATALOG, Song, SongCatalog } from '../../songs/domain/song-catalog';
 
 export interface UpsertDiaryEntryRequest {
@@ -63,14 +63,6 @@ export class DiariesService {
     const { from, to } = monthRange(month);
     return this.diaryEntryRepository.findManyByUserInRange(userId, from, to);
   }
-}
-
-function parseCalendarDate(value: string): Date {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-    throw new InvalidEntryDateError(value);
-  }
-  return date;
 }
 
 function monthRange(month: string): { from: Date; to: Date } {

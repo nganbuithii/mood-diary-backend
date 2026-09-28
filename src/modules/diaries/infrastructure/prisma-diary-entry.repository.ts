@@ -50,6 +50,26 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
       orderBy: { entryDate: 'asc' },
     });
   }
+
+  findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null> {
+    return this.prisma.moodEntry.findUnique({
+      where: { userId_entryDate: { userId, entryDate } },
+    });
+  }
+
+  countByUserOnOrBefore(userId: string, date: Date): Promise<number> {
+    return this.prisma.moodEntry.count({
+      where: { userId, entryDate: { lte: date } },
+    });
+  }
+
+  findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null> {
+    return this.prisma.moodEntry.findFirst({
+      where: { userId, entryDate: { lte: date } },
+      orderBy: { entryDate: 'asc' },
+      skip: offset,
+    });
+  }
 }
 
 function toSongColumns(song: Song | null | undefined) {
