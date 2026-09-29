@@ -66,6 +66,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     throw new Error('not used in memory tests');
   }
 
+  findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in memory tests');
+  }
+
   private onOrBefore(userId: string, date: Date): DiaryEntryEntity[] {
     return this.entries
       .filter((entry) => entry.userId === userId && entry.entryDate <= date)

@@ -42,6 +42,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
         .sort((a, b) => b.getTime() - a.getTime()),
     );
   }
+
+  findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in streak tests');
+  }
 }
 
 function setup(dates: string[], userId = 'user-1'): GetStreakUseCase {

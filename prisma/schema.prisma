@@ -81,5 +81,6 @@ model MoodEntry {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, entryDate])
+  @@index([userId, mood, entryDate])
   @@map("mood_entries")
 }
