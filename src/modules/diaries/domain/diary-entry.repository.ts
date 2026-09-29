@@ -34,6 +34,9 @@ export interface UpsertDiaryEntryInput {
 export interface DiaryEntryRepository {
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity>;
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]>;
+  findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
+  countByUserOnOrBefore(userId: string, date: Date): Promise<number>;
+  findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');

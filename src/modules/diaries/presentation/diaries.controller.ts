@@ -30,12 +30,16 @@ import { ACCESS_TOKEN_COOKIE } from '../../auth/infrastructure/auth-cookies';
 import { JwtAuthGuard } from '../../auth/infrastructure/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/current-user.decorator';
 import { DiariesService } from '../application/diaries.service';
+import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
 import { MAX_ENTRY_PHOTOS } from '../domain/diary-entry.repository';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
+import { MemoryDateOutOfRangeError } from '../domain/memory-date-out-of-range.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
 import { SongCatalogUnavailableError } from '../../songs/domain/song-catalog-unavailable.error';
+import { DailyMemoryResponseDto } from './dto/daily-memory-response.dto';
 import { DiaryEntryResponseDto } from './dto/diary-entry-response.dto';
+import { GetDailyMemoryQueryDto } from './dto/get-daily-memory-query.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
 import { UpsertDiaryEntryDto } from './dto/upsert-diary-entry.dto';
 
@@ -46,7 +50,10 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 @UseGuards(JwtAuthGuard)
 @Controller('diaries')
 export class DiariesController {
-  constructor(private readonly diariesService: DiariesService) {}
+  constructor(
+    private readonly diariesService: DiariesService,
+    private readonly getDailyMemoryUseCase: GetDailyMemoryUseCase,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -127,5 +134,24 @@ export class DiariesController {
   ): Promise<DiaryEntryResponseDto[]> {
     const entries = await this.diariesService.listEntriesForMonth(payload.sub, query.month);
     return entries.map((entry) => DiaryEntryResponseDto.fromEntity(entry));
+  }
+
+  @Get('memory/today')
+  @ApiOkResponse({ description: "Today's memory: an older entry of the user, or null", type: DailyMemoryResponseDto })
+  @ApiBadRequestResponse({ description: "Invalid date, or not the user's local today" })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async getDailyMemory(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Query() query: GetDailyMemoryQueryDto,
+  ): Promise<DailyMemoryResponseDto> {
+    try {
+      const memory = await this.getDailyMemoryUseCase.execute({ userId: payload.sub, today: query.date });
+      return DailyMemoryResponseDto.from(memory);
+    } catch (error) {
+      if (error instanceof InvalidEntryDateError || error instanceof MemoryDateOutOfRangeError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 }
