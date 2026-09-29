@@ -31,16 +31,20 @@ import { JwtAuthGuard } from '../../auth/infrastructure/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/current-user.decorator';
 import { DiariesService } from '../application/diaries.service';
 import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
+import { GetDiaryFeedUseCase } from '../application/get-diary-feed.use-case';
 import { GetStreakUseCase } from '../application/get-streak.use-case';
 import { MAX_ENTRY_PHOTOS } from '../domain/diary-entry.repository';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
+import { InvalidFeedCursorError } from '../domain/invalid-feed-cursor.error';
 import { LocalDateOutOfRangeError } from '../domain/local-date-out-of-range.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
 import { SongCatalogUnavailableError } from '../../songs/domain/song-catalog-unavailable.error';
 import { DailyMemoryResponseDto } from './dto/daily-memory-response.dto';
 import { DiaryEntryResponseDto } from './dto/diary-entry-response.dto';
+import { DiaryFeedPageDto } from './dto/diary-feed-page.dto';
 import { GetDailyMemoryQueryDto } from './dto/get-daily-memory-query.dto';
+import { GetDiaryFeedQueryDto } from './dto/get-diary-feed-query.dto';
 import { GetStreakQueryDto } from './dto/get-streak-query.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
 import { StreakResponseDto } from './dto/streak-response.dto';
@@ -57,6 +61,7 @@ export class DiariesController {
     private readonly diariesService: DiariesService,
     private readonly getDailyMemoryUseCase: GetDailyMemoryUseCase,
     private readonly getStreakUseCase: GetStreakUseCase,
+    private readonly getDiaryFeedUseCase: GetDiaryFeedUseCase,
   ) {}
 
   @Post()
@@ -138,6 +143,31 @@ export class DiariesController {
   ): Promise<DiaryEntryResponseDto[]> {
     const entries = await this.diariesService.listEntriesForMonth(payload.sub, query.month);
     return entries.map((entry) => DiaryEntryResponseDto.fromEntity(entry));
+  }
+
+  @Get('feed')
+  @ApiOkResponse({ description: "The user's entries, newest first, cursor-paginated", type: DiaryFeedPageDto })
+  @ApiBadRequestResponse({ description: 'Invalid mood, month, limit or cursor' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async getFeed(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Query() query: GetDiaryFeedQueryDto,
+  ): Promise<DiaryFeedPageDto> {
+    try {
+      const page = await this.getDiaryFeedUseCase.execute({
+        userId: payload.sub,
+        mood: query.mood,
+        month: query.month,
+        limit: query.limit,
+        cursor: query.cursor,
+      });
+      return DiaryFeedPageDto.from(page);
+    } catch (error) {
+      if (error instanceof InvalidFeedCursorError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Get('memory/today')

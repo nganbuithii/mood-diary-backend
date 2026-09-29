@@ -31,14 +31,23 @@ export interface UpsertDiaryEntryInput {
   song?: Song | null;
 }
 
+export interface DiaryFeedPageQuery {
+  userId: string;
+  mood?: DiaryMood;
+  from?: Date;
+  to?: Date;
+  before?: Date;
+  take: number;
+}
+
 export interface DiaryEntryRepository {
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity>;
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]>;
   findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
   countByUserOnOrBefore(userId: string, date: Date): Promise<number>;
   findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null>;
-  // Newest first.
   findEntryDatesOnOrBefore(userId: string, date: Date): Promise<Date[]>;
+  findPageNewestFirst(query: DiaryFeedPageQuery): Promise<DiaryEntryEntity[]>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');

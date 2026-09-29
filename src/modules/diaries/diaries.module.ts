@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { SongsModule } from '../songs/songs.module';
 import { DiariesService } from './application/diaries.service';
 import { GetDailyMemoryUseCase } from './application/get-daily-memory.use-case';
+import { GetDiaryFeedUseCase } from './application/get-diary-feed.use-case';
 import { GetStreakUseCase } from './application/get-streak.use-case';
 import { DIARY_ENTRY_REPOSITORY } from './domain/diary-entry.repository';
 import { DIARY_PHOTO_STORAGE } from './domain/diary-photo-storage';
@@ -17,6 +18,7 @@ import { DiariesController } from './presentation/diaries.controller';
     DiariesService,
     GetDailyMemoryUseCase,
     GetStreakUseCase,
+    GetDiaryFeedUseCase,
     { provide: DIARY_ENTRY_REPOSITORY, useClass: PrismaDiaryEntryRepository },
     { provide: DIARY_PHOTO_STORAGE, useClass: CloudinaryDiaryPhotoStorage },
   ],

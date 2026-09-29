@@ -78,6 +78,10 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   findEntryDatesOnOrBefore(): Promise<Date[]> {
     throw new Error('not used in DiariesService tests');
   }
+
+  findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in DiariesService tests');
+  }
 }
 
 class FakeDiaryPhotoStorage implements DiaryPhotoStorage {

@@ -8,7 +8,7 @@ import {
 } from '../domain/diary-entry.repository';
 import { DIARY_PHOTO_STORAGE, DiaryPhotoStorage } from '../domain/diary-photo-storage';
 import { SongNotFoundError } from '../domain/song-not-found.error';
-import { parseCalendarDate } from './calendar-date';
+import { monthRange, parseCalendarDate } from './calendar-date';
 import { SONG_CATALOG, Song, SongCatalog } from '../../songs/domain/song-catalog';
 
 export interface UpsertDiaryEntryRequest {
@@ -63,12 +63,4 @@ export class DiariesService {
     const { from, to } = monthRange(month);
     return this.diaryEntryRepository.findManyByUserInRange(userId, from, to);
   }
-}
-
-function monthRange(month: string): { from: Date; to: Date } {
-  const [year, monthNumber] = month.split('-').map(Number);
-  return {
-    from: new Date(Date.UTC(year, monthNumber - 1, 1)),
-    to: new Date(Date.UTC(year, monthNumber, 1)),
-  };
 }

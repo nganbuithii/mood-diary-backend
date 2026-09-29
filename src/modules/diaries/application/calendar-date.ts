@@ -19,3 +19,11 @@ export function parseLocalToday(value: string, now: Date): Date {
   }
   return today;
 }
+
+export function monthRange(month: string): { from: Date; to: Date } {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return {
+    from: new Date(Date.UTC(year, monthNumber - 1, 1)),
+    to: new Date(Date.UTC(year, monthNumber, 1)),
+  };
+}

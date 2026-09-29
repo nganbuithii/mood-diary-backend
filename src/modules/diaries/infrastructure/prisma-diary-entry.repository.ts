@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput } from '../domain/diary-entry.repository';
+import {
+  DiaryEntryEntity,
+  DiaryEntryRepository,
+  DiaryFeedPageQuery,
+  UpsertDiaryEntryInput,
+} from '../domain/diary-entry.repository';
 import { Song } from '../../songs/domain/song-catalog';
 
 const PRISMA_UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
@@ -79,6 +84,25 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
     });
     return rows.map((row) => row.entryDate);
   }
+
+  // entryDate is unique per user (@@unique([userId, entryDate])), so it alone gives a stable keyset order.
+  findPageNewestFirst(query: DiaryFeedPageQuery): Promise<DiaryEntryEntity[]> {
+    return this.prisma.moodEntry.findMany({
+      where: {
+        userId: query.userId,
+        mood: query.mood,
+        entryDate: { gte: query.from, lt: minDate(query.to, query.before) },
+      },
+      orderBy: { entryDate: 'desc' },
+      take: query.take,
+    });
+  }
+}
+
+function minDate(a: Date | undefined, b: Date | undefined): Date | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
 }
 
 function toSongColumns(song: Song | null | undefined) {
