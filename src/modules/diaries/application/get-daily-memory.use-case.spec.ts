@@ -1,7 +1,7 @@
 import { GetDailyMemoryUseCase } from './get-daily-memory.use-case';
 import { DiaryEntryEntity, DiaryEntryRepository } from '../domain/diary-entry.repository';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
-import { MemoryDateOutOfRangeError } from '../domain/memory-date-out-of-range.error';
+import { LocalDateOutOfRangeError } from '../domain/local-date-out-of-range.error';
 
 function buildEntry(id: string, entryDate: string, userId = 'user-1'): DiaryEntryEntity {
   return {
@@ -60,6 +60,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     offset: number,
   ): Promise<DiaryEntryEntity | null> {
     return Promise.resolve(this.onOrBefore(userId, date)[offset] ?? null);
+  }
+
+  findEntryDatesOnOrBefore(): Promise<Date[]> {
+    throw new Error('not used in memory tests');
   }
 
   private onOrBefore(userId: string, date: Date): DiaryEntryEntity[] {
@@ -221,7 +225,7 @@ describe('GetDailyMemoryUseCase', () => {
 
       await expect(
         useCase.execute({ userId: 'user-1', today }, noonUtc('2026-09-28')),
-      ).rejects.toBeInstanceOf(MemoryDateOutOfRangeError);
+      ).rejects.toBeInstanceOf(LocalDateOutOfRangeError);
     },
   );
 });

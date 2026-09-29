@@ -70,6 +70,15 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
       skip: offset,
     });
   }
+
+  async findEntryDatesOnOrBefore(userId: string, date: Date): Promise<Date[]> {
+    const rows = await this.prisma.moodEntry.findMany({
+      where: { userId, entryDate: { lte: date } },
+      select: { entryDate: true },
+      orderBy: { entryDate: 'desc' },
+    });
+    return rows.map((row) => row.entryDate);
+  }
 }
 
 function toSongColumns(song: Song | null | undefined) {

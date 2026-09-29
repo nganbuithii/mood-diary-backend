@@ -4,12 +4,9 @@ import {
   DiaryEntryEntity,
   DiaryEntryRepository,
 } from '../domain/diary-entry.repository';
-import { MemoryDateOutOfRangeError } from '../domain/memory-date-out-of-range.error';
-import { parseCalendarDate } from './calendar-date';
+import { DAY_MS, parseLocalToday } from './calendar-date';
 
 export const MIN_MEMORY_AGE_DAYS = 30;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface GetDailyMemoryInput {
   userId: string;
@@ -28,11 +25,7 @@ export class GetDailyMemoryUseCase {
   ) {}
 
   async execute(input: GetDailyMemoryInput, now: Date = new Date()): Promise<DailyMemory | null> {
-    const today = parseCalendarDate(input.today);
-    const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    if (Math.abs(today.getTime() - utcToday) > DAY_MS) {
-      throw new MemoryDateOutOfRangeError(input.today);
-    }
+    const today = parseLocalToday(input.today, now);
 
     const entry = await this.pickEntry(input.userId, today, input.today);
     return entry ? { entry, relativeLabel: relativeLabel(entry.entryDate, today) } : null;

@@ -37,6 +37,8 @@ export interface DiaryEntryRepository {
   findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
   countByUserOnOrBefore(userId: string, date: Date): Promise<number>;
   findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null>;
+  // Newest first.
+  findEntryDatesOnOrBefore(userId: string, date: Date): Promise<Date[]>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');

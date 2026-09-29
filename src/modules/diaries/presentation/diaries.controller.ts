@@ -31,16 +31,19 @@ import { JwtAuthGuard } from '../../auth/infrastructure/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/current-user.decorator';
 import { DiariesService } from '../application/diaries.service';
 import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
+import { GetStreakUseCase } from '../application/get-streak.use-case';
 import { MAX_ENTRY_PHOTOS } from '../domain/diary-entry.repository';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
-import { MemoryDateOutOfRangeError } from '../domain/memory-date-out-of-range.error';
+import { LocalDateOutOfRangeError } from '../domain/local-date-out-of-range.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
 import { SongCatalogUnavailableError } from '../../songs/domain/song-catalog-unavailable.error';
 import { DailyMemoryResponseDto } from './dto/daily-memory-response.dto';
 import { DiaryEntryResponseDto } from './dto/diary-entry-response.dto';
 import { GetDailyMemoryQueryDto } from './dto/get-daily-memory-query.dto';
+import { GetStreakQueryDto } from './dto/get-streak-query.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
+import { StreakResponseDto } from './dto/streak-response.dto';
 import { UpsertDiaryEntryDto } from './dto/upsert-diary-entry.dto';
 
 const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
@@ -53,6 +56,7 @@ export class DiariesController {
   constructor(
     private readonly diariesService: DiariesService,
     private readonly getDailyMemoryUseCase: GetDailyMemoryUseCase,
+    private readonly getStreakUseCase: GetStreakUseCase,
   ) {}
 
   @Post()
@@ -148,7 +152,26 @@ export class DiariesController {
       const memory = await this.getDailyMemoryUseCase.execute({ userId: payload.sub, today: query.date });
       return DailyMemoryResponseDto.from(memory);
     } catch (error) {
-      if (error instanceof InvalidEntryDateError || error instanceof MemoryDateOutOfRangeError) {
+      if (error instanceof InvalidEntryDateError || error instanceof LocalDateOutOfRangeError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Get('streak')
+  @ApiOkResponse({ description: "The user's writing streak", type: StreakResponseDto })
+  @ApiBadRequestResponse({ description: "Invalid date, or not the user's local today" })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async getStreak(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Query() query: GetStreakQueryDto,
+  ): Promise<StreakResponseDto> {
+    try {
+      const streak = await this.getStreakUseCase.execute({ userId: payload.sub, today: query.date });
+      return StreakResponseDto.from(streak);
+    } catch (error) {
+      if (error instanceof InvalidEntryDateError || error instanceof LocalDateOutOfRangeError) {
         throw new BadRequestException(error.message);
       }
       throw error;

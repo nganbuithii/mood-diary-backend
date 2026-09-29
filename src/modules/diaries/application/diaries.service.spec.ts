@@ -74,6 +74,10 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   findByUserOnOrBeforeAt(): Promise<DiaryEntryEntity | null> {
     throw new Error('not used in DiariesService tests');
   }
+
+  findEntryDatesOnOrBefore(): Promise<Date[]> {
+    throw new Error('not used in DiariesService tests');
+  }
 }
 
 class FakeDiaryPhotoStorage implements DiaryPhotoStorage {
