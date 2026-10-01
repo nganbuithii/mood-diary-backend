@@ -1,5 +1,5 @@
 import { GetStreakUseCase } from './get-streak.use-case';
-import { DiaryEntryEntity, DiaryEntryRepository } from '../domain/diary-entry.repository';
+import { DiaryEntryEntity, DiaryEntryRepository, MoodCount } from '../domain/diary-entry.repository';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 import { LocalDateOutOfRangeError } from '../domain/local-date-out-of-range.error';
 
@@ -64,6 +64,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   purge(): Promise<boolean> {
+    throw new Error('not used in streak tests');
+  }
+
+  countMoodsInRange(): Promise<MoodCount[]> {
     throw new Error('not used in streak tests');
   }
 }

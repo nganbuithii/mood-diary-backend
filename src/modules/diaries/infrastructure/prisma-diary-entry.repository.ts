@@ -5,6 +5,7 @@ import {
   DiaryEntryEntity,
   DiaryEntryRepository,
   DiaryFeedPageQuery,
+  MoodCount,
   UpsertDiaryEntryInput,
 } from '../domain/diary-entry.repository';
 import { Song } from '../../songs/domain/song-catalog';
@@ -144,6 +145,15 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
       where: { id, deletedAt: { lt: cutoff } },
     });
     return count > 0;
+  }
+
+  async countMoodsInRange(userId: string, from: Date, to: Date): Promise<MoodCount[]> {
+    const rows = await this.prisma.moodEntry.groupBy({
+      by: ['mood'],
+      where: { userId, entryDate: { gte: from, lt: to }, deletedAt: null },
+      _count: { _all: true },
+    });
+    return rows.map((row) => ({ mood: row.mood, count: row._count._all }));
   }
 }
 

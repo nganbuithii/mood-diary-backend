@@ -1,5 +1,5 @@
 import { DiariesService } from './diaries.service';
-import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput } from '../domain/diary-entry.repository';
+import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput, MoodCount } from '../domain/diary-entry.repository';
 import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
@@ -120,6 +120,10 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   purge(): Promise<boolean> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  countMoodsInRange(): Promise<MoodCount[]> {
     throw new Error('not used in DiariesService tests');
   }
 }

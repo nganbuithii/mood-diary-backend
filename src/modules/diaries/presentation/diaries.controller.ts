@@ -39,6 +39,7 @@ import { DeleteDiaryEntryUseCase } from '../application/delete-diary-entry.use-c
 import { DiariesService } from '../application/diaries.service';
 import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
 import { GetDiaryFeedUseCase } from '../application/get-diary-feed.use-case';
+import { GetMoodStatsUseCase } from '../application/get-mood-stats.use-case';
 import { GetStreakUseCase } from '../application/get-streak.use-case';
 import { SetDiaryFavoriteUseCase } from '../application/set-diary-favorite.use-case';
 import { DiaryEntryNotFoundError } from '../domain/diary-entry-not-found.error';
@@ -56,6 +57,7 @@ import { GetDailyMemoryQueryDto } from './dto/get-daily-memory-query.dto';
 import { GetDiaryFeedQueryDto } from './dto/get-diary-feed-query.dto';
 import { GetStreakQueryDto } from './dto/get-streak-query.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
+import { MoodStatsResponseDto } from './dto/mood-stats-response.dto';
 import { SetDiaryFavoriteDto } from './dto/set-diary-favorite.dto';
 import { StreakResponseDto } from './dto/streak-response.dto';
 import { UpsertDiaryEntryDto } from './dto/upsert-diary-entry.dto';
@@ -72,6 +74,7 @@ export class DiariesController {
     private readonly getDailyMemoryUseCase: GetDailyMemoryUseCase,
     private readonly getStreakUseCase: GetStreakUseCase,
     private readonly getDiaryFeedUseCase: GetDiaryFeedUseCase,
+    private readonly getMoodStatsUseCase: GetMoodStatsUseCase,
     private readonly setDiaryFavoriteUseCase: SetDiaryFavoriteUseCase,
     private readonly deleteDiaryEntryUseCase: DeleteDiaryEntryUseCase,
   ) {}
@@ -217,6 +220,18 @@ export class DiariesController {
     } catch (error) {
       throw toEntryByDateHttpError(error);
     }
+  }
+
+  @Get('stats')
+  @ApiOkResponse({ description: 'Mood statistics for the month, with the previous month to compare', type: MoodStatsResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid month' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async getStats(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Query() query: ListDiaryEntriesQueryDto,
+  ): Promise<MoodStatsResponseDto> {
+    const stats = await this.getMoodStatsUseCase.execute({ userId: payload.sub, month: query.month });
+    return MoodStatsResponseDto.fromStats(stats);
   }
 
   @Get('memory/today')

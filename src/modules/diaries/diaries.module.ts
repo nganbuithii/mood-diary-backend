@@ -5,6 +5,7 @@ import { DeleteDiaryEntryUseCase } from './application/delete-diary-entry.use-ca
 import { DiariesService } from './application/diaries.service';
 import { GetDailyMemoryUseCase } from './application/get-daily-memory.use-case';
 import { GetDiaryFeedUseCase } from './application/get-diary-feed.use-case';
+import { GetMoodStatsUseCase } from './application/get-mood-stats.use-case';
 import { GetStreakUseCase } from './application/get-streak.use-case';
 import { PurgeDeletedEntriesUseCase } from './application/purge-deleted-entries.use-case';
 import { SetDiaryFavoriteUseCase } from './application/set-diary-favorite.use-case';
@@ -23,6 +24,7 @@ import { DiariesController } from './presentation/diaries.controller';
     GetDailyMemoryUseCase,
     GetStreakUseCase,
     GetDiaryFeedUseCase,
+    GetMoodStatsUseCase,
     SetDiaryFavoriteUseCase,
     DeleteDiaryEntryUseCase,
     PurgeDeletedEntriesUseCase,

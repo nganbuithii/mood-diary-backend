@@ -1,5 +1,5 @@
 import { DELETED_ENTRY_RETENTION_DAYS, PurgeDeletedEntriesUseCase } from './purge-deleted-entries.use-case';
-import { DiaryEntryEntity, DiaryEntryRepository } from '../domain/diary-entry.repository';
+import { DiaryEntryEntity, DiaryEntryRepository, MoodCount } from '../domain/diary-entry.repository';
 import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -88,6 +88,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     if (index === -1) return Promise.resolve(false);
     this.entries.splice(index, 1);
     return Promise.resolve(true);
+  }
+
+  countMoodsInRange(): Promise<MoodCount[]> {
+    throw new Error('not used in purge tests');
   }
 }
 

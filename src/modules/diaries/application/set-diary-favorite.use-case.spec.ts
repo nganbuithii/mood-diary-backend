@@ -1,5 +1,5 @@
 import { SetDiaryFavoriteUseCase } from './set-diary-favorite.use-case';
-import { DiaryEntryEntity, DiaryEntryRepository } from '../domain/diary-entry.repository';
+import { DiaryEntryEntity, DiaryEntryRepository, MoodCount } from '../domain/diary-entry.repository';
 import { DiaryEntryNotFoundError } from '../domain/diary-entry-not-found.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
 
@@ -80,6 +80,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   purge(): Promise<boolean> {
+    throw new Error('not used in favorite tests');
+  }
+
+  countMoodsInRange(): Promise<MoodCount[]> {
     throw new Error('not used in favorite tests');
   }
 }

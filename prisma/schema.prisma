@@ -86,5 +86,6 @@ model MoodEntry {
   @@unique([userId, entryDate])
   @@index([userId, mood, entryDate])
   @@index([userId, isFavorite, entryDate])
+  @@index([deletedAt])
   @@map("mood_entries")
 }

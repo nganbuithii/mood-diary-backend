@@ -4,6 +4,7 @@ import {
   DiaryEntryRepository,
   DiaryFeedPageQuery,
   DiaryMood,
+  MoodCount,
 } from '../domain/diary-entry.repository';
 import { InvalidFeedCursorError } from '../domain/invalid-feed-cursor.error';
 
@@ -99,6 +100,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   purge(): Promise<boolean> {
+    throw new Error('not used in feed tests');
+  }
+
+  countMoodsInRange(): Promise<MoodCount[]> {
     throw new Error('not used in feed tests');
   }
 }

@@ -94,6 +94,19 @@ và entry của user đó.
 | `MoodEntry(userId, entryDate)` UNIQUE | Quy tắc "một ngày một trang"; cũng là khoá định danh entry trong API (ADR-001) và khoá cho upsert |
 | `MoodEntry(userId, mood, entryDate)` index | Feed lọc theo mood, mới nhất trước |
 | `MoodEntry(userId, isFavorite, entryDate)` index | Feed favorites, mới nhất trước |
+| `MoodEntry(deletedAt)` index | Job purge tìm entry đã soft delete quá hạn. Thiếu index này, truy vấn phải quét gần hết bảng khi có ít entry bị xoá (đo 2026-10-01, 200k dòng: ~500–1200 ms → 0.4 ms) |
+
+Kết quả đo `EXPLAIN ANALYZE` (2026-10-01, PGlite, 500 user × 400 ngày = 200k
+entry, ~5% đã soft delete):
+
+- Mọi truy vấn theo một user (lịch tháng, feed, feed lọc mood, favorites,
+  streak, stats `groupBy`) đều dùng index có `userId` đứng đầu, dưới 1 ms
+  (streak khoảng 6 ms vì đọc mọi ngày của user). Điều kiện `deletedAt IS NULL`
+  chỉ lọc bỏ vài dòng sau khi đã đi qua index, nên **không cần partial index**
+  cho các truy vấn này.
+- Prisma 6 không khai báo được partial index trong schema (thêm bằng SQL tay
+  thì `migrate dev` sẽ coi là lệch schema). Index thường trên `deletedAt` cho
+  kết quả tương đương với job purge, nên dùng cách đó.
 
 Ghi chú về `MoodEntry`:
 

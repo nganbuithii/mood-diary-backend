@@ -35,6 +35,11 @@ export interface UpsertDiaryEntryInput {
   isFavorite?: boolean;
 }
 
+export interface MoodCount {
+  mood: DiaryMood;
+  count: number;
+}
+
 export interface DiaryFeedPageQuery {
   userId: string;
   mood?: DiaryMood;
@@ -65,6 +70,8 @@ export interface DiaryEntryRepository {
   findDeletedBefore(cutoff: Date, take: number, afterId?: string): Promise<DiaryEntryEntity[]>;
   /** Removes the row for good, but only if it is still soft-deleted before `cutoff`. */
   purge(id: string, cutoff: Date): Promise<boolean>;
+  /** Live entries per mood dated in [from, to); moods with no entries are left out. */
+  countMoodsInRange(userId: string, from: Date, to: Date): Promise<MoodCount[]>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');
