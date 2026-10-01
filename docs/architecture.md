@@ -66,27 +66,46 @@ thật.
 6. Cross-cutting: global exception filter map domain error → HTTP status;
    interceptor gắn correlation id; global `ValidationPipe` chặn DTO sai.
 
-## 5. Database schema MVP
+## 5. Database schema
+
+Nguồn chuẩn là `prisma/schema.prisma`. Bảng dưới là bản tóm tắt, cập nhật
+2026-10-01.
 
 ```
-User            (id, email UNIQUE, passwordHash, displayName, createdAt, updatedAt)
-RefreshToken    (id, userId FK, tokenHash, familyId, revokedAt?, replacedByTokenId?, expiresAt, createdAt)
+User               (id, email UNIQUE, passwordHash, displayName, avatarUrl?, createdAt, updatedAt)
+RefreshToken       (id, userId FK, tokenHash UNIQUE, familyId, revokedAt?, replacedByTokenId?, expiresAt, createdAt)
 PasswordResetToken (id, userId FK, tokenHash UNIQUE, usedAt?, expiresAt, createdAt)
-DiaryEntry      (id, userId FK, title?, content, moodType enum, moodIntensity int, createdAt, updatedAt)
-Tag             (id, userId FK, name, createdAt)
-DiaryTag        (diaryId FK, tagId FK)   -- composite PK, bảng nối
+MoodEntry          (id, userId FK, entryDate DATE, mood enum, note?, photoUrls text[],
+                    songExternalId?, songTitle?, songArtist?, songArtworkUrl?, songPreviewUrl?,
+                    isFavorite, deletedAt?, createdAt, updatedAt)
+
+enum Mood: VERY_SAD | SAD | NEUTRAL | HAPPY | VERY_HAPPY
 ```
+
+Mọi bảng con đều `onDelete: Cascade` theo `User`: xoá user là xoá hết token
+và entry của user đó.
 
 | Constraint/Index | Lý do |
 |---|---|
-| `User.email` UNIQUE | Chặn duplicate account ở DB (race condition khi 2 request đăng ký cùng lúc) |
-| `RefreshToken(familyId)` index | Reuse detection cần revoke nhanh toàn bộ family |
-| `PasswordResetToken.tokenHash` UNIQUE | Chỉ lưu hash (SHA-256) của reset token, không lưu raw — giống `RefreshToken` |
-| `DiaryTag(diaryId, tagId)` composite PK | Chặn gắn trùng tag ở tầng DB |
-| `DiaryEntry(userId, createdAt DESC)` composite index | Phục vụ query timeline cursor-paginated |
-| `Tag(userId, name)` UNIQUE | Chặn user tạo trùng tên tag |
+| `User.email` UNIQUE | Chặn trùng tài khoản ở DB (race khi 2 request đăng ký cùng lúc) |
+| `RefreshToken.tokenHash` UNIQUE | Chỉ lưu hash của refresh token; tra token khi refresh/logout |
+| `RefreshToken(userId)`, `RefreshToken(familyId)` index | Revoke toàn bộ token của user (đổi mật khẩu) hoặc của một family (reuse detection) |
+| `PasswordResetToken.tokenHash` UNIQUE | Chỉ lưu hash (SHA-256) của reset token, không lưu raw |
+| `MoodEntry(userId, entryDate)` UNIQUE | Quy tắc "một ngày một trang"; cũng là khoá định danh entry trong API (ADR-001) và khoá cho upsert |
+| `MoodEntry(userId, mood, entryDate)` index | Feed lọc theo mood, mới nhất trước |
+| `MoodEntry(userId, isFavorite, entryDate)` index | Feed favorites, mới nhất trước |
 
-Chưa tạo `Mood`/`Streak`/`Achievement` — thuộc phạm vi mở rộng sau.
+Ghi chú về `MoodEntry`:
+
+- `entryDate` là ngày theo lịch địa phương của user (`DATE`, không có giờ).
+- Các cột `song*` là bản chụp bài hát lúc chọn, nên entry vẫn hiển thị được
+  khi bài hát bị gỡ khỏi catalog.
+- `photoUrls` là URL Cloudinary trong thư mục `mood-diary/diary-photos/`,
+  tối đa 3 ảnh.
+- `deletedAt` khác null nghĩa là entry đã bị soft delete (ADR-002).
+
+Chưa có `Tag`/`DiaryTag`, `Streak`/`Achievement`. Streak được tính lại từ
+các entry ở mỗi request, không lưu.
 
 ## 6. Roadmap
 
@@ -118,6 +137,9 @@ quáng:
   `schema.prisma`, chuyển sang bắt buộc `prisma.config.ts` + driver adapter
   — một thay đổi kiến trúc lớn, còn quá mới để xây nền tảng học tập lên đó.
   6.x vẫn dùng pattern `url = env("DATABASE_URL")` quen thuộc.
+- **`@nestjs/schedule` 6.x** (không dùng 12.x, thêm 2026-10-01): bản 12
+  phát hành dạng ESM thuần (`"type": "module"`), cùng vấn đề với Jest như
+  `@nestjs/testing` 12. Bản 6.x vẫn là CJS và hỗ trợ Nest 11.
 - **ESLint 10 (flat config)**: dự án dùng `eslint.config.js` (không phải
   `.eslintrc.js`) vì ESLint 9+ đã bỏ format cũ.
 
@@ -185,10 +207,29 @@ xoá dòng và không xoá ảnh trên Cloudinary. Chưa có API khôi phục.
   (`DiariesService.upsertEntry`). Từ lúc đó dữ liệu cũ không còn.
 - Xoá entry đã xoá, hoặc favorite entry đã xoá, trả 404 như entry không tồn tại.
 
+**Dọn dữ liệu (2026-10-01):**
+
+- `PurgeDeletedEntriesUseCase` xoá hẳn các entry đã soft delete quá
+  `DELETED_ENTRY_RETENTION_DAYS` (30 ngày): xoá ảnh trên Cloudinary trước,
+  rồi mới xoá dòng. Nếu một ảnh xoá lỗi thì giữ dòng lại cho lần chạy sau,
+  vì dòng là nơi duy nhất còn ghi ảnh nào cần xoá.
+- Lệnh xoá dòng có điều kiện `deletedAt < cutoff`, nên entry mà user vừa
+  viết lại trong lúc job đang chạy sẽ không bị xoá nhầm.
+- Job chạy lúc 03:00 UTC hằng ngày (`PurgeDeletedEntriesScheduler`, dùng
+  `@nestjs/schedule`). App chạy một instance nên cron trong process là đủ.
+  Trên host ngủ khi không có người dùng (Render free), lần chạy có thể bị bỏ
+  lỡ; lần sau sẽ dọn bù. Nếu sau này chạy nhiều instance, phải chuyển sang
+  job ngoài hoặc thêm lock để không chạy trùng.
+- Ảnh bị thay khi lưu entry (chọn ảnh mới khi sửa, hoặc viết lại vào ngày
+  đã xoá) được `DiariesService.upsertEntry` xoá ngay sau khi lưu thành công.
+  Lỗi xoá ảnh chỉ ghi log, không làm hỏng việc lưu.
+- `CloudinaryDiaryPhotoStorage.delete` chỉ xoá ảnh trong thư mục
+  `mood-diary/diary-photos/`, từ chối mọi URL khác.
+
 **Còn mở:**
 
-- Ảnh của entry đã xoá (và ảnh cũ bị ghi đè khi viết lại) vẫn nằm trên
-  Cloudinary. Cần một job định kỳ để xoá hẳn các entry đã soft delete quá X
-  ngày và dọn ảnh tương ứng.
-- Nếu cần Undo hoặc thùng rác, thêm route restore (đặt `deletedAt = null`).
-  Dữ liệu đã được giữ sẵn cho việc này.
+- Ảnh bị thay mà xoá lỗi lúc lưu sẽ nằm lại trên Cloudinary vì không còn
+  dòng nào tham chiếu. Nếu cần dọn triệt để, làm job đối chiếu danh sách ảnh
+  trên Cloudinary với `photoUrls` trong DB.
+- Nếu cần Undo hoặc thùng rác, thêm route restore (đặt `deletedAt = null`)
+  trong khoảng 30 ngày trước khi bị purge.

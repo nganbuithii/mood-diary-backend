@@ -58,6 +58,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   softDelete(): Promise<boolean> {
     throw new Error('not used in streak tests');
   }
+
+  findDeletedBefore(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in streak tests');
+  }
+
+  purge(): Promise<boolean> {
+    throw new Error('not used in streak tests');
+  }
 }
 
 function setup(dates: string[], userId = 'user-1'): GetStreakUseCase {

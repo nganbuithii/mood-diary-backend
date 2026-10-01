@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   DIARY_ENTRY_REPOSITORY,
   DiaryEntryEntity,
@@ -9,6 +9,7 @@ import {
 import { DIARY_PHOTO_STORAGE, DiaryPhotoStorage } from '../domain/diary-photo-storage';
 import { SongNotFoundError } from '../domain/song-not-found.error';
 import { monthRange, parseCalendarDate } from './calendar-date';
+import { deletePhotos } from './delete-photos';
 import { SONG_CATALOG, Song, SongCatalog } from '../../songs/domain/song-catalog';
 
 export interface UpsertDiaryEntryRequest {
@@ -22,6 +23,8 @@ export interface UpsertDiaryEntryRequest {
 
 @Injectable()
 export class DiariesService {
+  private readonly logger = new Logger(DiariesService.name);
+
   constructor(
     @Inject(DIARY_ENTRY_REPOSITORY) private readonly diaryEntryRepository: DiaryEntryRepository,
     @Inject(DIARY_PHOTO_STORAGE) private readonly diaryPhotoStorage: DiaryPhotoStorage,
@@ -31,9 +34,13 @@ export class DiariesService {
   async upsertEntry(input: UpsertDiaryEntryRequest): Promise<DiaryEntryEntity> {
     const entryDate = parseCalendarDate(input.date);
     const song = await this.resolveSong(input.songId);
-    
-    const isRevivingDeleted =
-      (await this.diaryEntryRepository.findDeletedByUserAndDate(input.userId, entryDate)) !== null;
+    const liveEntry = await this.diaryEntryRepository.findByUserAndDate(input.userId, entryDate);
+    const deletedEntry = liveEntry
+      ? null
+      : await this.diaryEntryRepository.findDeletedByUserAndDate(input.userId, entryDate);
+
+
+    const isRevivingDeleted = deletedEntry !== null;
     const note = input.note?.trim();
     const photoFiles = (input.photos ?? []).slice(0, MAX_ENTRY_PHOTOS);
     const photoUrls =
@@ -43,7 +50,7 @@ export class DiariesService {
           )
         : undefined;
 
-    return this.diaryEntryRepository.upsert({
+    const saved = await this.diaryEntryRepository.upsert({
       userId: input.userId,
       entryDate,
       mood: input.mood,
@@ -52,6 +59,15 @@ export class DiariesService {
       song: isRevivingDeleted ? (song ?? null) : song,
       isFavorite: isRevivingDeleted ? false : undefined,
     });
+
+    const previousPhotoUrls = (liveEntry ?? deletedEntry)?.photoUrls ?? [];
+    const replaced = previousPhotoUrls.filter((url) => !saved.photoUrls.includes(url));
+    const failed = await deletePhotos(this.diaryPhotoStorage, replaced);
+    if (failed.length > 0) {
+      this.logger.warn(`Couldn't delete ${failed.length} replaced photo(s) of entry ${saved.id}: ${failed.join(', ')}`);
+    }
+
+    return saved;
   }
 
   private async resolveSong(songId: string | undefined): Promise<Song | null | undefined> {

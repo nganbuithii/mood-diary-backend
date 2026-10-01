@@ -74,6 +74,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   softDelete(): Promise<boolean> {
     throw new Error('not used in favorite tests');
   }
+
+  findDeletedBefore(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in favorite tests');
+  }
+
+  purge(): Promise<boolean> {
+    throw new Error('not used in favorite tests');
+  }
 }
 
 function setup(entries: DiaryEntryEntity[]) {

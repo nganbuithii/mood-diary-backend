@@ -83,6 +83,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     this.entries[index] = { ...this.entries[index], deletedAt };
     return Promise.resolve(true);
   }
+
+  findDeletedBefore(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in delete tests');
+  }
+
+  purge(): Promise<boolean> {
+    throw new Error('not used in delete tests');
+  }
 }
 
 const NOW = new Date('2026-10-01T08:00:00.000Z');

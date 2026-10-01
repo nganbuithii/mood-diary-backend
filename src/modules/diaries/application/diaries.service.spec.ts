@@ -43,10 +43,14 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity> {
     this.upsertCalls.push(input);
     const { song, photoUrls, ...rest } = input;
+    // Like the real repository: photoUrls left undefined keeps the photos already on that day's row.
+    const existing = this.entries.find(
+      (entry) => entry.userId === input.userId && entry.entryDate.getTime() === input.entryDate.getTime(),
+    );
     return Promise.resolve(
       buildEntry({
         ...rest,
-        photoUrls: photoUrls ?? [],
+        photoUrls: photoUrls ?? existing?.photoUrls ?? [],
         songExternalId: song?.id ?? null,
         songTitle: song?.title ?? null,
         songArtist: song?.artist ?? null,
@@ -65,8 +69,15 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
     );
   }
 
-  findByUserAndDate(): Promise<DiaryEntryEntity | null> {
-    throw new Error('not used in DiariesService tests');
+  findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null> {
+    return Promise.resolve(
+      this.entries.find(
+        (entry) =>
+          entry.userId === userId &&
+          entry.entryDate.getTime() === entryDate.getTime() &&
+          entry.deletedAt === null,
+      ) ?? null,
+    );
   }
 
   countByUserOnOrBefore(): Promise<number> {
@@ -103,14 +114,30 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   softDelete(): Promise<boolean> {
     throw new Error('not used in DiariesService tests');
   }
+
+  findDeletedBefore(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  purge(): Promise<boolean> {
+    throw new Error('not used in DiariesService tests');
+  }
 }
 
 class FakeDiaryPhotoStorage implements DiaryPhotoStorage {
   public uploadCalls: Array<{ userId: string; file: Buffer }> = [];
+  public deletedUrls: string[] = [];
+  public failingUrls = new Set<string>();
 
   upload(userId: string, file: Buffer): Promise<DiaryPhotoUploadResult> {
     this.uploadCalls.push({ userId, file });
     return Promise.resolve({ url: `https://cdn.test/${userId}/${this.uploadCalls.length}.jpg` });
+  }
+
+  delete(url: string): Promise<void> {
+    if (this.failingUrls.has(url)) return Promise.reject(new Error('storage down'));
+    this.deletedUrls.push(url);
+    return Promise.resolve();
   }
 }
 
@@ -315,6 +342,64 @@ describe('DiariesService', () => {
         expect(diaryEntryRepository.upsertCalls[0].photoUrls).toBeUndefined();
         expect(diaryEntryRepository.upsertCalls[0].isFavorite).toBeUndefined();
       });
+    });
+  });
+
+  describe('upsertEntry photo cleanup', () => {
+    const liveEntry = buildEntry({ photoUrls: ['https://cdn.test/old-1.jpg', 'https://cdn.test/old-2.jpg'] });
+
+    it('deletes the previous photos from storage once new ones replace them', async () => {
+      const { service, diaryPhotoStorage } = setup([liveEntry]);
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] });
+
+      expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-1.jpg', 'https://cdn.test/old-2.jpg']);
+    });
+
+    it('keeps the photos when the edit sends no new ones', async () => {
+      const { service, diaryPhotoStorage } = setup([liveEntry]);
+
+      const entry = await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', note: 'edited' });
+
+      expect(diaryPhotoStorage.deletedUrls).toEqual([]);
+      expect(entry.photoUrls).toEqual(liveEntry.photoUrls);
+    });
+
+    it("deletes the deleted entry's photos when writing on that day again", async () => {
+      const deletedEntry = buildEntry({
+        photoUrls: ['https://cdn.test/old-1.jpg'],
+        deletedAt: new Date('2026-09-26T00:00:00.000Z'),
+      });
+      const { service, diaryPhotoStorage } = setup([deletedEntry]);
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+
+      expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-1.jpg']);
+    });
+
+    it('still saves the entry when a replaced photo cannot be deleted', async () => {
+      const { service, diaryPhotoStorage } = setup([liveEntry]);
+      diaryPhotoStorage.failingUrls.add('https://cdn.test/old-1.jpg');
+
+      const entry = await service.upsertEntry({
+        userId: 'user-1',
+        date: '2026-09-25',
+        mood: 'HAPPY',
+        photos: [Buffer.from('a')],
+      });
+
+      expect(entry.photoUrls).toEqual(['https://cdn.test/user-1/1.jpg']);
+      expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-2.jpg']);
+    });
+
+    it('does not touch storage when the save itself fails', async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup([liveEntry]);
+      diaryEntryRepository.upsert = () => Promise.reject(new Error('db down'));
+
+      await expect(
+        service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] }),
+      ).rejects.toThrow('db down');
+      expect(diaryPhotoStorage.deletedUrls).toEqual([]);
     });
   });
 

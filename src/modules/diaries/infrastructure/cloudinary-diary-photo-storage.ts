@@ -6,7 +6,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 
-const DIARY_PHOTO_FOLDER = 'mood-diary/diary-photos';
+export const DIARY_PHOTO_FOLDER = 'mood-diary/diary-photos';
 
 @Injectable()
 export class CloudinaryDiaryPhotoStorage implements DiaryPhotoStorage {
@@ -50,4 +50,46 @@ export class CloudinaryDiaryPhotoStorage implements DiaryPhotoStorage {
       Readable.from(file).pipe(uploadStream);
     });
   }
+
+  async delete(url: string): Promise<void> {
+    const publicId = publicIdFromUrl(url);
+    if (!publicId) {
+      throw new Error(`Not a diary photo URL, refusing to delete: ${url}`);
+    }
+
+    const result = (await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'image',
+      invalidate: true,
+    })) as { result?: string };
+    // "not found" means an earlier attempt already removed it.
+    if (result.result !== 'ok' && result.result !== 'not found') {
+      throw new Error(`Cloudinary destroy failed for ${publicId}: ${result.result ?? 'empty result'}`);
+    }
+  }
+}
+
+/**
+ * Extracts the Cloudinary public_id from a delivery URL, e.g.
+ * https://res.cloudinary.com/demo/image/upload/v17/mood-diary/diary-photos/u1/abc.jpg
+ * → mood-diary/diary-photos/u1/abc. Returns null for anything outside the diary photo
+ * folder, so a bad URL in the database can never delete an unrelated asset.
+ */
+export function publicIdFromUrl(url: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+
+  const marker = '/image/upload/';
+  const markerIndex = pathname.indexOf(marker);
+  if (markerIndex === -1) return null;
+
+  const segments = pathname.slice(markerIndex + marker.length).split('/');
+  // Skip the optional version segment (v1695...) Cloudinary puts before the public_id.
+  if (/^v\d+$/.test(segments[0] ?? '')) segments.shift();
+
+  const publicId = decodeURIComponent(segments.join('/')).replace(/\.[a-z0-9]+$/i, '');
+  return publicId.startsWith(`${DIARY_PHOTO_FOLDER}/`) && !publicId.includes('..') ? publicId : null;
 }

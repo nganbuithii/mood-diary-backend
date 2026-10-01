@@ -130,6 +130,21 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
     });
     return count > 0;
   }
+
+  findDeletedBefore(cutoff: Date, take: number, afterId?: string): Promise<DiaryEntryEntity[]> {
+    return this.prisma.moodEntry.findMany({
+      where: { deletedAt: { lt: cutoff }, id: afterId ? { gt: afterId } : undefined },
+      orderBy: { id: 'asc' },
+      take,
+    });
+  }
+
+  async purge(id: string, cutoff: Date): Promise<boolean> {
+    const { count } = await this.prisma.moodEntry.deleteMany({
+      where: { id, deletedAt: { lt: cutoff } },
+    });
+    return count > 0;
+  }
 }
 
 function isRecordNotFound(error: unknown): boolean {

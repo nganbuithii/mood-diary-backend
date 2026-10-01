@@ -84,6 +84,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     throw new Error('not used in memory tests');
   }
 
+  findDeletedBefore(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in memory tests');
+  }
+
+  purge(): Promise<boolean> {
+    throw new Error('not used in memory tests');
+  }
+
 
   private onOrBefore(userId: string, date: Date): DiaryEntryEntity[] {
     return this.entries

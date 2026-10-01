@@ -46,7 +46,7 @@ export interface DiaryFeedPageQuery {
   take: number;
 }
 
-// Soft-deleted entries are invisible to every read below except findDeletedByUserAndDate.
+// Soft-deleted entries are invisible to every read below except findDeletedByUserAndDate and
 export interface DiaryEntryRepository {
   /** Also brings a soft-deleted entry on that date back to life. */
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity>;
@@ -61,6 +61,10 @@ export interface DiaryEntryRepository {
   findDeletedByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
   /** Returns false when there is no live entry on that date. */
   softDelete(userId: string, entryDate: Date, deletedAt: Date): Promise<boolean>;
+  /** Entries soft-deleted before `cutoff`, ordered by id; pass the last id seen as `afterId` to page. */
+  findDeletedBefore(cutoff: Date, take: number, afterId?: string): Promise<DiaryEntryEntity[]>;
+  /** Removes the row for good, but only if it is still soft-deleted before `cutoff`. */
+  purge(id: string, cutoff: Date): Promise<boolean>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');
