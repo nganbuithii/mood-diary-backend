@@ -6,6 +6,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
   Post,
   Query,
   UploadedFiles,
@@ -19,6 +22,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCookieAuth,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiPayloadTooLargeResponse,
   ApiTags,
@@ -33,6 +37,8 @@ import { DiariesService } from '../application/diaries.service';
 import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
 import { GetDiaryFeedUseCase } from '../application/get-diary-feed.use-case';
 import { GetStreakUseCase } from '../application/get-streak.use-case';
+import { SetDiaryFavoriteUseCase } from '../application/set-diary-favorite.use-case';
+import { DiaryEntryNotFoundError } from '../domain/diary-entry-not-found.error';
 import { MAX_ENTRY_PHOTOS } from '../domain/diary-entry.repository';
 import { InvalidDiaryPhotoError } from '../domain/invalid-diary-photo.error';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
@@ -47,6 +53,7 @@ import { GetDailyMemoryQueryDto } from './dto/get-daily-memory-query.dto';
 import { GetDiaryFeedQueryDto } from './dto/get-diary-feed-query.dto';
 import { GetStreakQueryDto } from './dto/get-streak-query.dto';
 import { ListDiaryEntriesQueryDto } from './dto/list-diary-entries-query.dto';
+import { SetDiaryFavoriteDto } from './dto/set-diary-favorite.dto';
 import { StreakResponseDto } from './dto/streak-response.dto';
 import { UpsertDiaryEntryDto } from './dto/upsert-diary-entry.dto';
 
@@ -62,6 +69,7 @@ export class DiariesController {
     private readonly getDailyMemoryUseCase: GetDailyMemoryUseCase,
     private readonly getStreakUseCase: GetStreakUseCase,
     private readonly getDiaryFeedUseCase: GetDiaryFeedUseCase,
+    private readonly setDiaryFavoriteUseCase: SetDiaryFavoriteUseCase,
   ) {}
 
   @Post()
@@ -147,7 +155,7 @@ export class DiariesController {
 
   @Get('feed')
   @ApiOkResponse({ description: "The user's entries, newest first, cursor-paginated", type: DiaryFeedPageDto })
-  @ApiBadRequestResponse({ description: 'Invalid mood, month, limit or cursor' })
+  @ApiBadRequestResponse({ description: 'Invalid mood, month, favorite, limit or cursor' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
   async getFeed(
     @CurrentUser() payload: AccessTokenPayload,
@@ -158,6 +166,7 @@ export class DiariesController {
         userId: payload.sub,
         mood: query.mood,
         month: query.month,
+        favorite: query.favorite,
         limit: query.limit,
         cursor: query.cursor,
       });
@@ -165,6 +174,34 @@ export class DiariesController {
     } catch (error) {
       if (error instanceof InvalidFeedCursorError) {
         throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Patch(':date/favorite')
+  @ApiOkResponse({ description: 'The entry with its favorite flag updated', type: DiaryEntryResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid date or isFavorite' })
+  @ApiNotFoundResponse({ description: 'No entry on that date' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async setFavorite(
+    @CurrentUser() payload: AccessTokenPayload,
+    @Param('date') date: string,
+    @Body() dto: SetDiaryFavoriteDto,
+  ): Promise<DiaryEntryResponseDto> {
+    try {
+      const entry = await this.setDiaryFavoriteUseCase.execute({
+        userId: payload.sub,
+        date,
+        isFavorite: dto.isFavorite,
+      });
+      return DiaryEntryResponseDto.fromEntity(entry);
+    } catch (error) {
+      if (error instanceof InvalidEntryDateError) {
+        throw new BadRequestException(error.message);
+      }
+      if (error instanceof DiaryEntryNotFoundError) {
+        throw new NotFoundException(error.message);
       }
       throw error;
     }

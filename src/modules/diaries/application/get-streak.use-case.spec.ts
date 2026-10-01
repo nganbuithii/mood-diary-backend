@@ -46,6 +46,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
     throw new Error('not used in streak tests');
   }
+
+  setFavorite(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in streak tests');
+  }
 }
 
 function setup(dates: string[], userId = 'user-1'): GetStreakUseCase {

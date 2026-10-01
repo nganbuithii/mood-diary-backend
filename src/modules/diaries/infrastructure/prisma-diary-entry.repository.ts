@@ -10,6 +10,7 @@ import {
 import { Song } from '../../songs/domain/song-catalog';
 
 const PRISMA_UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
+const PRISMA_RECORD_NOT_FOUND = 'P2025';
 
 @Injectable()
 export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
@@ -91,11 +92,27 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
       where: {
         userId: query.userId,
         mood: query.mood,
+        isFavorite: query.favorite ? true : undefined,
         entryDate: { gte: query.from, lt: minDate(query.to, query.before) },
       },
       orderBy: { entryDate: 'desc' },
       take: query.take,
     });
+  }
+
+  // The (userId, entryDate) unique key doubles as the ownership check: another user's entry is never matched.
+  async setFavorite(userId: string, entryDate: Date, isFavorite: boolean): Promise<DiaryEntryEntity | null> {
+    try {
+      return await this.prisma.moodEntry.update({
+        where: { userId_entryDate: { userId, entryDate } },
+        data: { isFavorite },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === PRISMA_RECORD_NOT_FOUND) {
+        return null;
+      }
+      throw error;
+    }
   }
 }
 

@@ -15,6 +15,7 @@ function buildEntry(id: string, entryDate: string, userId = 'user-1'): DiaryEntr
     songArtist: null,
     songArtworkUrl: null,
     songPreviewUrl: null,
+    isFavorite: false,
     entryDate: new Date(`${entryDate}T00:00:00.000Z`),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -67,6 +68,10 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in memory tests');
+  }
+
+  setFavorite(): Promise<DiaryEntryEntity | null> {
     throw new Error('not used in memory tests');
   }
 

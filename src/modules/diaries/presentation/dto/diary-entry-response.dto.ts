@@ -21,6 +21,9 @@ export class DiaryEntryResponseDto {
   @ApiProperty({ type: SongResponseDto, nullable: true })
   song: SongResponseDto | null;
 
+  @ApiProperty({ example: false })
+  isFavorite: boolean;
+
   @ApiProperty({ example: '2026-09-25T10:00:00.000Z' })
   createdAt: Date;
 
@@ -44,6 +47,7 @@ export class DiaryEntryResponseDto {
             previewUrl: entry.songPreviewUrl,
           })
         : null;
+    dto.isFavorite = entry.isFavorite;
     dto.createdAt = entry.createdAt;
     dto.updatedAt = entry.updatedAt;
     return dto;

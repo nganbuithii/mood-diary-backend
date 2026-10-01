@@ -25,6 +25,7 @@ function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity
     songArtist: null,
     songArtworkUrl: null,
     songPreviewUrl: null,
+    isFavorite: false,
     entryDate: new Date('2026-09-25T00:00:00.000Z'),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -80,6 +81,10 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   findPageNewestFirst(): Promise<DiaryEntryEntity[]> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  setFavorite(): Promise<DiaryEntryEntity | null> {
     throw new Error('not used in DiariesService tests');
   }
 }

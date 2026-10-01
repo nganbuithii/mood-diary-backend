@@ -12,6 +12,8 @@ export interface GetDiaryFeedInput {
   userId: string;
   mood?: DiaryMood;
   month?: string;
+  /** When true, only favorite entries. */
+  favorite?: boolean;
   limit: number;
   cursor?: string;
 }
@@ -38,6 +40,7 @@ export class GetDiaryFeedUseCase {
     const rows = await this.diaryEntryRepository.findPageNewestFirst({
       userId: input.userId,
       mood: input.mood,
+      favorite: input.favorite,
       from: range?.from,
       to: range?.to,
       before,
@@ -55,14 +58,25 @@ export class GetDiaryFeedUseCase {
 
 // The cursor also carries the filters, so it only continues the feed it came from.
 function encodeCursor(entryDate: Date, input: GetDiaryFeedInput): string {
-  const cursor = { d: entryDate.toISOString().slice(0, 10), mood: input.mood, month: input.month };
+  // `fav` is left out of non-favorite cursors, so cursors issued before the filter existed stay valid.
+  const cursor = {
+    d: entryDate.toISOString().slice(0, 10),
+    mood: input.mood,
+    month: input.month,
+    fav: input.favorite || undefined,
+  };
   return Buffer.from(JSON.stringify(cursor)).toString('base64url');
 }
 
 function decodeCursor(cursor: string, input: GetDiaryFeedInput): Date {
   try {
     const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as Record<string, unknown>;
-    if (typeof parsed.d === 'string' && parsed.mood === input.mood && parsed.month === input.month) {
+    if (
+      typeof parsed.d === 'string' &&
+      parsed.mood === input.mood &&
+      parsed.month === input.month &&
+      parsed.fav === (input.favorite || undefined)
+    ) {
       return parseCalendarDate(parsed.d);
     }
   } catch {

@@ -23,6 +23,7 @@ function buildEntry(date: string, mood: DiaryMood = 'HAPPY', userId = 'user-1'):
     songArtist: null,
     songArtworkUrl: null,
     songPreviewUrl: null,
+    isFavorite: false,
     entryDate: toDate(date),
     createdAt: toDate(date),
     updatedAt: toDate(date),
@@ -70,6 +71,7 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
           (entry) =>
             entry.userId === query.userId &&
             (!query.mood || entry.mood === query.mood) &&
+            (!query.favorite || entry.isFavorite) &&
             (!query.from || entry.entryDate >= query.from) &&
             (!query.to || entry.entryDate < query.to) &&
             (!query.before || entry.entryDate < query.before),
@@ -78,6 +80,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
         .slice(0, query.take),
     );
   }
+
+  setFavorite(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in feed tests');
+  }
+}
+
+function favorite(entry: DiaryEntryEntity): DiaryEntryEntity {
+  return { ...entry, isFavorite: true };
 }
 
 function setup(entries: DiaryEntryEntity[]) {
@@ -225,6 +235,59 @@ describe('GetDiaryFeedUseCase', () => {
         useCase.execute({ userId: 'user-1', limit: 1, cursor: nextCursor!, ...filters }),
       ).rejects.toBeInstanceOf(InvalidFeedCursorError);
     }
+  });
+
+  it('returns only favorites when favorite is true, alone or with other filters', async () => {
+    const { useCase } = setup([
+      favorite(buildEntry('2026-09-20', 'HAPPY')),
+      buildEntry('2026-09-15', 'HAPPY'),
+      favorite(buildEntry('2026-09-10', 'SAD')),
+      favorite(buildEntry('2026-08-20', 'HAPPY')),
+    ]);
+
+    const all = await useCase.execute({ userId: 'user-1', limit: 12, favorite: true });
+    const happy = await useCase.execute({ userId: 'user-1', limit: 12, favorite: true, mood: 'HAPPY' });
+    const september = await useCase.execute({ userId: 'user-1', limit: 12, favorite: true, month: '2026-09' });
+
+    expect(datesOf(all.entries)).toEqual(['2026-09-20', '2026-09-10', '2026-08-20']);
+    expect(datesOf(happy.entries)).toEqual(['2026-09-20', '2026-08-20']);
+    expect(datesOf(september.entries)).toEqual(['2026-09-20', '2026-09-10']);
+  });
+
+  it('treats favorite: false the same as no favorite filter', async () => {
+    const { useCase } = setup([favorite(buildEntry('2026-09-20')), buildEntry('2026-09-19'), buildEntry('2026-09-18')]);
+
+    const first = await useCase.execute({ userId: 'user-1', limit: 2, favorite: false });
+    const second = await useCase.execute({ userId: 'user-1', limit: 2, cursor: first.nextCursor! });
+
+    expect(datesOf(first.entries)).toEqual(['2026-09-20', '2026-09-19']);
+    expect(datesOf(second.entries)).toEqual(['2026-09-18']);
+  });
+
+  it('keeps the favorite filter when paging', async () => {
+    const { useCase } = setup(
+      daysBack('2026-09-29', 6).map((date, index) => (index % 2 === 0 ? favorite(buildEntry(date)) : buildEntry(date))),
+    );
+
+    const first = await useCase.execute({ userId: 'user-1', limit: 2, favorite: true });
+    const second = await useCase.execute({ userId: 'user-1', limit: 2, favorite: true, cursor: first.nextCursor! });
+
+    expect(datesOf(first.entries)).toEqual(['2026-09-29', '2026-09-27']);
+    expect(datesOf(second.entries)).toEqual(['2026-09-25']);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('rejects a cursor moved between the favorites feed and the full feed', async () => {
+    const { useCase } = setup(daysBack('2026-09-29', 3).map((date) => favorite(buildEntry(date))));
+    const favoritesPage = await useCase.execute({ userId: 'user-1', limit: 1, favorite: true });
+    const fullPage = await useCase.execute({ userId: 'user-1', limit: 1 });
+
+    await expect(
+      useCase.execute({ userId: 'user-1', limit: 1, cursor: favoritesPage.nextCursor! }),
+    ).rejects.toBeInstanceOf(InvalidFeedCursorError);
+    await expect(
+      useCase.execute({ userId: 'user-1', limit: 1, favorite: true, cursor: fullPage.nextCursor! }),
+    ).rejects.toBeInstanceOf(InvalidFeedCursorError);
   });
 
   it('rejects a limit below 1', async () => {

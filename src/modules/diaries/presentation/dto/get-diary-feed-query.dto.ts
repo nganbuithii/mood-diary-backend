@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { DIARY_MOODS, DiaryMood } from '../../domain/diary-entry.repository';
 
 export const DEFAULT_FEED_LIMIT = 12;
@@ -16,6 +16,13 @@ export class GetDiaryFeedQueryDto {
   @IsOptional()
   @Matches(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/, { message: 'month must be in YYYY-MM format' })
   month?: string;
+
+  @ApiPropertyOptional({ type: Boolean, example: true, description: 'true for favorite entries only' })
+  @IsOptional()
+  // Query values arrive as strings; map them explicitly since Boolean('false') would be true.
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean({ message: 'favorite must be true or false' })
+  favorite?: boolean;
 
   @ApiPropertyOptional({ default: DEFAULT_FEED_LIMIT, minimum: 1, maximum: MAX_FEED_LIMIT })
   @IsOptional()

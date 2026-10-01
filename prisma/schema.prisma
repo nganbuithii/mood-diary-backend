@@ -75,6 +75,7 @@ model MoodEntry {
   songArtist     String?
   songArtworkUrl String?
   songPreviewUrl String?
+  isFavorite     Boolean  @default(false)
   entryDate      DateTime @db.Date
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -82,5 +83,6 @@ model MoodEntry {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, entryDate])
   @@index([userId, mood, entryDate])
+  @@index([userId, isFavorite, entryDate])
   @@map("mood_entries")
 }

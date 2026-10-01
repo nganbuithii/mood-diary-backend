@@ -17,6 +17,7 @@ export interface DiaryEntryEntity {
   songArtist: string | null;
   songArtworkUrl: string | null;
   songPreviewUrl: string | null;
+  isFavorite: boolean;
   entryDate: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,8 @@ export interface UpsertDiaryEntryInput {
 export interface DiaryFeedPageQuery {
   userId: string;
   mood?: DiaryMood;
+  /** When true, only favorite entries. */
+  favorite?: boolean;
   from?: Date;
   to?: Date;
   before?: Date;
@@ -48,6 +51,8 @@ export interface DiaryEntryRepository {
   findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null>;
   findEntryDatesOnOrBefore(userId: string, date: Date): Promise<Date[]>;
   findPageNewestFirst(query: DiaryFeedPageQuery): Promise<DiaryEntryEntity[]>;
+  /** Returns null when the user has no entry on that date. */
+  setFavorite(userId: string, entryDate: Date, isFavorite: boolean): Promise<DiaryEntryEntity | null>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');
