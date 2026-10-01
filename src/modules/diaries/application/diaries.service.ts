@@ -31,6 +31,9 @@ export class DiariesService {
   async upsertEntry(input: UpsertDiaryEntryRequest): Promise<DiaryEntryEntity> {
     const entryDate = parseCalendarDate(input.date);
     const song = await this.resolveSong(input.songId);
+    
+    const isRevivingDeleted =
+      (await this.diaryEntryRepository.findDeletedByUserAndDate(input.userId, entryDate)) !== null;
     const note = input.note?.trim();
     const photoFiles = (input.photos ?? []).slice(0, MAX_ENTRY_PHOTOS);
     const photoUrls =
@@ -45,8 +48,9 @@ export class DiariesService {
       entryDate,
       mood: input.mood,
       note: note ? note : null,
-      photoUrls,
-      song,
+      photoUrls: isRevivingDeleted ? (photoUrls ?? []) : photoUrls,
+      song: isRevivingDeleted ? (song ?? null) : song,
+      isFavorite: isRevivingDeleted ? false : undefined,
     });
   }
 

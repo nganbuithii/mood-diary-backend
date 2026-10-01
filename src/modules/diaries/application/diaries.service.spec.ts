@@ -26,6 +26,7 @@ function buildEntry(overrides: Partial<DiaryEntryEntity> = {}): DiaryEntryEntity
     songArtworkUrl: null,
     songPreviewUrl: null,
     isFavorite: false,
+    deletedAt: null,
     entryDate: new Date('2026-09-25T00:00:00.000Z'),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -85,6 +86,21 @@ class FakeDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   setFavorite(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in DiariesService tests');
+  }
+
+  findDeletedByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null> {
+    return Promise.resolve(
+      this.entries.find(
+        (entry) =>
+          entry.userId === userId &&
+          entry.entryDate.getTime() === entryDate.getTime() &&
+          entry.deletedAt !== null,
+      ) ?? null,
+    );
+  }
+
+  softDelete(): Promise<boolean> {
     throw new Error('not used in DiariesService tests');
   }
 }
@@ -253,6 +269,52 @@ describe('DiariesService', () => {
       ).rejects.toThrow(SongNotFoundError);
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
       expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
+    });
+
+    describe('on a day whose entry was deleted', () => {
+      const deletedEntry = buildEntry({
+        photoUrls: ['https://cdn.test/old.jpg'],
+        songExternalId: SUNFLOWER.id,
+        songTitle: SUNFLOWER.title,
+        songArtist: SUNFLOWER.artist,
+        isFavorite: true,
+        deletedAt: new Date('2026-09-26T00:00:00.000Z'),
+      });
+
+      it('starts a fresh page: clears photos, song and favorite left from the deleted entry', async () => {
+        const { service, diaryEntryRepository } = setup([deletedEntry]);
+
+        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+
+        expect(diaryEntryRepository.upsertCalls[0]).toMatchObject({ photoUrls: [], song: null, isFavorite: false });
+      });
+
+      it('still uses the photos and song sent with the new entry', async () => {
+        const { service, diaryEntryRepository } = setup([deletedEntry]);
+
+        await service.upsertEntry({
+          userId: 'user-1',
+          date: '2026-09-25',
+          mood: 'SAD',
+          photos: [Buffer.from('a')],
+          songId: SUNFLOWER.id,
+        });
+
+        expect(diaryEntryRepository.upsertCalls[0]).toMatchObject({
+          photoUrls: ['https://cdn.test/user-1/1.jpg'],
+          song: SUNFLOWER,
+          isFavorite: false,
+        });
+      });
+
+      it("ignores another user's deleted entry on the same date", async () => {
+        const { service, diaryEntryRepository } = setup([{ ...deletedEntry, userId: 'user-2' }]);
+
+        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+
+        expect(diaryEntryRepository.upsertCalls[0].photoUrls).toBeUndefined();
+        expect(diaryEntryRepository.upsertCalls[0].isFavorite).toBeUndefined();
+      });
     });
   });
 

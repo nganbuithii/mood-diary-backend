@@ -18,6 +18,7 @@ export interface DiaryEntryEntity {
   songArtworkUrl: string | null;
   songPreviewUrl: string | null;
   isFavorite: boolean;
+  deletedAt: Date | null;
   entryDate: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +31,8 @@ export interface UpsertDiaryEntryInput {
   note: string | null;
   photoUrls?: string[];
   song?: Song | null;
+  /** Omit to keep the current value. */
+  isFavorite?: boolean;
 }
 
 export interface DiaryFeedPageQuery {
@@ -43,7 +46,9 @@ export interface DiaryFeedPageQuery {
   take: number;
 }
 
+// Soft-deleted entries are invisible to every read below except findDeletedByUserAndDate.
 export interface DiaryEntryRepository {
+  /** Also brings a soft-deleted entry on that date back to life. */
   upsert(input: UpsertDiaryEntryInput): Promise<DiaryEntryEntity>;
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]>;
   findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
@@ -53,6 +58,9 @@ export interface DiaryEntryRepository {
   findPageNewestFirst(query: DiaryFeedPageQuery): Promise<DiaryEntryEntity[]>;
   /** Returns null when the user has no entry on that date. */
   setFavorite(userId: string, entryDate: Date, isFavorite: boolean): Promise<DiaryEntryEntity | null>;
+  findDeletedByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null>;
+  /** Returns false when there is no live entry on that date. */
+  softDelete(userId: string, entryDate: Date, deletedAt: Date): Promise<boolean>;
 }
 
 export const DIARY_ENTRY_REPOSITORY = Symbol('DIARY_ENTRY_REPOSITORY');

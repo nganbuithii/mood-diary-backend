@@ -24,6 +24,7 @@ function buildEntry(date: string, mood: DiaryMood = 'HAPPY', userId = 'user-1'):
     songArtworkUrl: null,
     songPreviewUrl: null,
     isFavorite: false,
+    deletedAt: null,
     entryDate: toDate(date),
     createdAt: toDate(date),
     updatedAt: toDate(date),
@@ -82,6 +83,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   }
 
   setFavorite(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in feed tests');
+  }
+
+  findDeletedByUserAndDate(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in feed tests');
+  }
+
+  softDelete(): Promise<boolean> {
     throw new Error('not used in feed tests');
   }
 }

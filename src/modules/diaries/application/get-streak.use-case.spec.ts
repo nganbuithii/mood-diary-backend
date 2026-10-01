@@ -50,6 +50,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   setFavorite(): Promise<DiaryEntryEntity | null> {
     throw new Error('not used in streak tests');
   }
+
+  findDeletedByUserAndDate(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in streak tests');
+  }
+
+  softDelete(): Promise<boolean> {
+    throw new Error('not used in streak tests');
+  }
 }
 
 function setup(dates: string[], userId = 'user-1'): GetStreakUseCase {

@@ -124,3 +124,71 @@ quáng:
 Đây cũng là một bài học thực tế đáng ghi nhớ: trước khi lock version cho một
 dependency quan trọng, luôn kiểm tra release notes/breaking changes thay vì
 mặc định cài `latest`.
+
+## 8. Quyết định thiết kế (ADR)
+
+Mỗi mục ghi lại một quyết định đã chốt, lý do, và điều kiện để xem xét lại.
+Muốn đổi quyết định thì sửa mục tương ứng (ghi ngày đổi), không xoá.
+
+### ADR-001 — Định danh diary entry theo ngày, không theo `id` (2026-10-01)
+
+**Quyết định:** các API thao tác trên một entry của chính user định danh entry
+bằng ngày, không bằng `id`:
+`POST /diaries` (upsert theo `date` trong body), `PATCH /diaries/:date/favorite`,
+`DELETE /diaries/:date`. Response vẫn trả `id`.
+
+**Bối cảnh:** sản phẩm theo quy tắc "một ngày một trang", đã khoá ở DB bằng
+`@@unique([userId, entryDate])` trên `MoodEntry`. Vì vậy cặp
+(user, ngày) xác định duy nhất một entry, tương đương `id`.
+
+**Lý do:**
+
+- Bám theo domain: API nói đúng ngôn ngữ sản phẩm ("xoá ngày 20/9"), lịch,
+  deep link `/diary?date=` và cache phía FE cũng tra theo ngày.
+- Nhất quán: mọi thao tác trên entry dùng cùng một kiểu định danh. Trộn hai kiểu
+  (tạo theo ngày, xoá theo id) dễ gây nhầm.
+- Ownership đúng ngay từ cấu trúc: `userId` lấy từ access token, query luôn là
+  `WHERE userId = ? AND entryDate = ?`, nên không thể chạm vào entry của
+  người khác. Định danh theo `id` thì mỗi query phải tự nhớ thêm điều kiện
+  `userId`; quên một chỗ là thành lỗ hổng IDOR.
+- YAGNI: chưa có use case cần định danh bằng `id`.
+
+**Lưu ý khi dùng:** `date` là **ngày theo lịch địa phương của user**
+(`YYYY-MM-DD`, do client gửi), không phải timestamp. Server lưu dạng `DATE`
+và parse chặt bằng `parseCalendarDate` (từ chối ngày không tồn tại như
+`2026-02-30`).
+
+**Xem xét lại khi:**
+
+- Cho phép **nhiều entry trong một ngày**. Khi đó ngày không còn duy nhất:
+  chuyển sang `id`, bỏ upsert theo ngày.
+- Làm tính năng **chia sẻ hoặc xem entry của người khác** (Friends). Entry
+  của người khác dùng `id` (UUID) qua route riêng, ví dụ `/entries/:id`,
+  có kiểm tra quyền riêng. Route `/diaries/:date` vẫn là "nhật ký của tôi".
+
+Chuyển sang `id` là thay đổi **chỉ thêm**: thêm route mới song song, không
+phá client cũ, nên không cần làm trước.
+
+### ADR-002 — Xoá entry là soft delete (2026-10-01)
+
+**Quyết định:** `DELETE /diaries/:date` chỉ ghi `MoodEntry.deletedAt`, không
+xoá dòng và không xoá ảnh trên Cloudinary. Chưa có API khôi phục.
+
+**Hệ quả:**
+
+- Mọi truy vấn đọc trong `PrismaDiaryEntryRepository` lọc
+  `deletedAt: null`: lịch tháng, feed, favorites, streak, little memory.
+  Streak được tính lại mỗi request nên tự đúng sau khi xoá.
+- Mỗi user mỗi ngày vẫn chỉ có một dòng (giữ unique `(userId, entryDate)`,
+  không cần partial unique index). Viết lại vào ngày đã xoá sẽ dùng lại dòng
+  đó với nội dung mới hoàn toàn: ảnh, bài hát và favorite của entry cũ bị reset
+  (`DiariesService.upsertEntry`). Từ lúc đó dữ liệu cũ không còn.
+- Xoá entry đã xoá, hoặc favorite entry đã xoá, trả 404 như entry không tồn tại.
+
+**Còn mở:**
+
+- Ảnh của entry đã xoá (và ảnh cũ bị ghi đè khi viết lại) vẫn nằm trên
+  Cloudinary. Cần một job định kỳ để xoá hẳn các entry đã soft delete quá X
+  ngày và dọn ảnh tương ứng.
+- Nếu cần Undo hoặc thùng rác, thêm route restore (đặt `deletedAt = null`).
+  Dữ liệu đã được giữ sẵn cho việc này.

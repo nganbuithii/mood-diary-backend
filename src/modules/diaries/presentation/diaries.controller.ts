@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -22,6 +23,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCookieAuth,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiPayloadTooLargeResponse,
@@ -33,6 +35,7 @@ import { AccessTokenPayload } from '../../auth/domain/token-issuer';
 import { ACCESS_TOKEN_COOKIE } from '../../auth/infrastructure/auth-cookies';
 import { JwtAuthGuard } from '../../auth/infrastructure/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/current-user.decorator';
+import { DeleteDiaryEntryUseCase } from '../application/delete-diary-entry.use-case';
 import { DiariesService } from '../application/diaries.service';
 import { GetDailyMemoryUseCase } from '../application/get-daily-memory.use-case';
 import { GetDiaryFeedUseCase } from '../application/get-diary-feed.use-case';
@@ -70,6 +73,7 @@ export class DiariesController {
     private readonly getStreakUseCase: GetStreakUseCase,
     private readonly getDiaryFeedUseCase: GetDiaryFeedUseCase,
     private readonly setDiaryFavoriteUseCase: SetDiaryFavoriteUseCase,
+    private readonly deleteDiaryEntryUseCase: DeleteDiaryEntryUseCase,
   ) {}
 
   @Post()
@@ -197,13 +201,21 @@ export class DiariesController {
       });
       return DiaryEntryResponseDto.fromEntity(entry);
     } catch (error) {
-      if (error instanceof InvalidEntryDateError) {
-        throw new BadRequestException(error.message);
-      }
-      if (error instanceof DiaryEntryNotFoundError) {
-        throw new NotFoundException(error.message);
-      }
-      throw error;
+      throw toEntryByDateHttpError(error);
+    }
+  }
+
+  @Delete(':date')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Entry deleted (soft delete)' })
+  @ApiBadRequestResponse({ description: 'Invalid date' })
+  @ApiNotFoundResponse({ description: 'No entry on that date' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
+  async delete(@CurrentUser() payload: AccessTokenPayload, @Param('date') date: string): Promise<void> {
+    try {
+      await this.deleteDiaryEntryUseCase.execute({ userId: payload.sub, date });
+    } catch (error) {
+      throw toEntryByDateHttpError(error);
     }
   }
 
@@ -244,4 +256,11 @@ export class DiariesController {
       throw error;
     }
   }
+}
+
+// Shared by the routes that address one entry by its :date.
+function toEntryByDateHttpError(error: unknown): unknown {
+  if (error instanceof InvalidEntryDateError) return new BadRequestException(error.message);
+  if (error instanceof DiaryEntryNotFoundError) return new NotFoundException(error.message);
+  return error;
 }

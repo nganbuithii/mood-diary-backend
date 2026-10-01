@@ -20,6 +20,7 @@ function buildEntry(date: string, userId = 'user-1', isFavorite = false): DiaryE
     songArtworkUrl: null,
     songPreviewUrl: null,
     isFavorite,
+    deletedAt: null,
     entryDate: toDate(date),
     createdAt: toDate(date),
     updatedAt: toDate(date),
@@ -64,6 +65,14 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
     if (index === -1) return Promise.resolve(null);
     this.entries[index] = { ...this.entries[index], isFavorite };
     return Promise.resolve(this.entries[index]);
+  }
+
+  findDeletedByUserAndDate(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in favorite tests');
+  }
+
+  softDelete(): Promise<boolean> {
+    throw new Error('not used in favorite tests');
   }
 }
 

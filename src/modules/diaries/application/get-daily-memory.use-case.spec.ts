@@ -16,6 +16,7 @@ function buildEntry(id: string, entryDate: string, userId = 'user-1'): DiaryEntr
     songArtworkUrl: null,
     songPreviewUrl: null,
     isFavorite: false,
+    deletedAt: null,
     entryDate: new Date(`${entryDate}T00:00:00.000Z`),
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -74,6 +75,15 @@ class InMemoryDiaryEntryRepository implements DiaryEntryRepository {
   setFavorite(): Promise<DiaryEntryEntity | null> {
     throw new Error('not used in memory tests');
   }
+
+  findDeletedByUserAndDate(): Promise<DiaryEntryEntity | null> {
+    throw new Error('not used in memory tests');
+  }
+
+  softDelete(): Promise<boolean> {
+    throw new Error('not used in memory tests');
+  }
+
 
   private onOrBefore(userId: string, date: Date): DiaryEntryEntity[] {
     return this.entries

@@ -46,32 +46,34 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
         note: input.note,
         photoUrls: input.photoUrls,
         ...toSongColumns(input.song),
+        isFavorite: input.isFavorite,
+        deletedAt: null,
       },
     });
   }
 
   findManyByUserInRange(userId: string, from: Date, to: Date): Promise<DiaryEntryEntity[]> {
     return this.prisma.moodEntry.findMany({
-      where: { userId, entryDate: { gte: from, lt: to } },
+      where: { userId, entryDate: { gte: from, lt: to }, deletedAt: null },
       orderBy: { entryDate: 'asc' },
     });
   }
 
   findByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null> {
     return this.prisma.moodEntry.findUnique({
-      where: { userId_entryDate: { userId, entryDate } },
+      where: { userId_entryDate: { userId, entryDate }, deletedAt: null },
     });
   }
 
   countByUserOnOrBefore(userId: string, date: Date): Promise<number> {
     return this.prisma.moodEntry.count({
-      where: { userId, entryDate: { lte: date } },
+      where: { userId, entryDate: { lte: date }, deletedAt: null },
     });
   }
 
   findByUserOnOrBeforeAt(userId: string, date: Date, offset: number): Promise<DiaryEntryEntity | null> {
     return this.prisma.moodEntry.findFirst({
-      where: { userId, entryDate: { lte: date } },
+      where: { userId, entryDate: { lte: date }, deletedAt: null },
       orderBy: { entryDate: 'asc' },
       skip: offset,
     });
@@ -79,7 +81,7 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
 
   async findEntryDatesOnOrBefore(userId: string, date: Date): Promise<Date[]> {
     const rows = await this.prisma.moodEntry.findMany({
-      where: { userId, entryDate: { lte: date } },
+      where: { userId, entryDate: { lte: date }, deletedAt: null },
       select: { entryDate: true },
       orderBy: { entryDate: 'desc' },
     });
@@ -93,6 +95,7 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
         userId: query.userId,
         mood: query.mood,
         isFavorite: query.favorite ? true : undefined,
+        deletedAt: null,
         entryDate: { gte: query.from, lt: minDate(query.to, query.before) },
       },
       orderBy: { entryDate: 'desc' },
@@ -104,16 +107,33 @@ export class PrismaDiaryEntryRepository implements DiaryEntryRepository {
   async setFavorite(userId: string, entryDate: Date, isFavorite: boolean): Promise<DiaryEntryEntity | null> {
     try {
       return await this.prisma.moodEntry.update({
-        where: { userId_entryDate: { userId, entryDate } },
+        where: { userId_entryDate: { userId, entryDate }, deletedAt: null },
         data: { isFavorite },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === PRISMA_RECORD_NOT_FOUND) {
-        return null;
-      }
+      if (isRecordNotFound(error)) return null;
       throw error;
     }
   }
+
+  findDeletedByUserAndDate(userId: string, entryDate: Date): Promise<DiaryEntryEntity | null> {
+    return this.prisma.moodEntry.findUnique({
+      where: { userId_entryDate: { userId, entryDate }, deletedAt: { not: null } },
+    });
+  }
+
+  // updateMany so the "still live" check and the write happen in one statement.
+  async softDelete(userId: string, entryDate: Date, deletedAt: Date): Promise<boolean> {
+    const { count } = await this.prisma.moodEntry.updateMany({
+      where: { userId, entryDate, deletedAt: null },
+      data: { deletedAt },
+    });
+    return count > 0;
+  }
+}
+
+function isRecordNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === PRISMA_RECORD_NOT_FOUND;
 }
 
 function minDate(a: Date | undefined, b: Date | undefined): Date | undefined {
