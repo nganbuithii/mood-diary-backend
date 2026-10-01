@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
-import { MailSender, SendPasswordResetEmailInput } from '../domain/mail-sender';
+import { MailSender, SendLetterReadyEmailInput, SendPasswordResetEmailInput } from '../domain/mail-sender';
 
 @Injectable()
 export class NodemailerMailSender implements MailSender {
@@ -28,6 +28,20 @@ export class NodemailerMailSender implements MailSender {
       subject: 'Reset your Mood Diary password',
       text: `Open this link to reset your password: ${input.resetLink}\n\nThis link expires soon and can only be used once. If you didn't request this, you can ignore this email.`,
       html: `<p>Open this link to reset your password:</p><p><a href="${input.resetLink}">${input.resetLink}</a></p><p>This link expires soon and can only be used once. If you didn't request this, you can ignore this email.</p>`,
+    });
+  }
+
+  async sendLetterReadyEmail(input: SendLetterReadyEmailInput): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to: input.to,
+      subject: 'A letter from your past self has arrived 💌',
+      text: `The letter you sealed ${input.sealedAgo} is ready to open.
+
+Open it here: ${input.openLink}
+
+Only you can read it, inside Mood Diary.`,
+      html: `<p>The letter you sealed <strong>${input.sealedAgo}</strong> is ready to open.</p><p><a href="${input.openLink}">Open your letter</a></p><p>Only you can read it, inside Mood Diary.</p>`,
     });
   }
 }

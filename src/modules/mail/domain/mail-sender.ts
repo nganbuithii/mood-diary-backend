@@ -3,8 +3,15 @@ export interface SendPasswordResetEmailInput {
   resetLink: string;
 }
 
+export interface SendLetterReadyEmailInput {
+  to: string;
+  openLink: string;
+  sealedAgo: string;
+}
+
 export interface MailSender {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
+  sendLetterReadyEmail(input: SendLetterReadyEmailInput): Promise<void>;
 }
 
 export const MAIL_SENDER = Symbol('MAIL_SENDER');

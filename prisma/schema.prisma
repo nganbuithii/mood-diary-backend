@@ -27,11 +27,10 @@ model User {
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   moodEntries         MoodEntry[]
+  futureLetters       FutureLetter[]
 
   @@map("users")
 }
-
-// familyId + reuse detection: see mood-diary architecture plan section 6/7.
 model RefreshToken {
   id                String    @id @default(uuid())
   userId            String
@@ -88,4 +87,22 @@ model MoodEntry {
   @@index([userId, isFavorite, entryDate])
   @@index([deletedAt])
   @@map("mood_entries")
+}
+
+model FutureLetter {
+  id            String    @id @default(uuid())
+  userId        String
+  body          String
+  moodAtWriting Mood?
+  deliverAt     DateTime
+  openedAt      DateTime?
+  emailSentAt   DateTime?
+  emailAttempts Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, deliverAt])
+  @@index([emailSentAt, deliverAt])
+  @@map("future_letters")
 }

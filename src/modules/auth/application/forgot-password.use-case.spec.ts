@@ -7,7 +7,7 @@ import {
   PasswordResetTokenEntity,
   PasswordResetTokenRepository,
 } from '../domain/password-reset-token.repository';
-import { MailSender, SendPasswordResetEmailInput } from '../domain/mail-sender';
+import { MailSender, SendPasswordResetEmailInput } from '../../mail/domain/mail-sender';
 
 function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
   return {
@@ -92,6 +92,10 @@ class FakeMailSender implements MailSender {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
     this.sentEmails.push(input);
     return Promise.resolve();
+  }
+
+  sendLetterReadyEmail(): Promise<void> {
+    throw new Error('not used in forgot-password tests');
   }
 }
 

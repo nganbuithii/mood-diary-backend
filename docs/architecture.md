@@ -78,6 +78,8 @@ PasswordResetToken (id, userId FK, tokenHash UNIQUE, usedAt?, expiresAt, created
 MoodEntry          (id, userId FK, entryDate DATE, mood enum, note?, photoUrls text[],
                     songExternalId?, songTitle?, songArtist?, songArtworkUrl?, songPreviewUrl?,
                     isFavorite, deletedAt?, createdAt, updatedAt)
+FutureLetter       (id, userId FK, body, moodAtWriting?, deliverAt, openedAt?,
+                    emailSentAt?, emailAttempts, createdAt)
 
 enum Mood: VERY_SAD | SAD | NEUTRAL | HAPPY | VERY_HAPPY
 ```
@@ -95,6 +97,8 @@ và entry của user đó.
 | `MoodEntry(userId, mood, entryDate)` index | Feed lọc theo mood, mới nhất trước |
 | `MoodEntry(userId, isFavorite, entryDate)` index | Feed favorites, mới nhất trước |
 | `MoodEntry(deletedAt)` index | Job purge tìm entry đã soft delete quá hạn. Thiếu index này, truy vấn phải quét gần hết bảng khi có ít entry bị xoá (đo 2026-10-01, 200k dòng: ~500–1200 ms → 0.4 ms) |
+| `FutureLetter(userId, deliverAt)` index | Hộp thư của một user, sắp theo ngày mở |
+| `FutureLetter(emailSentAt, deliverAt)` index | Cron tìm thư đã tới hạn mà chưa gửi email |
 
 Kết quả đo `EXPLAIN ANALYZE` (2026-10-01, PGlite, 500 user × 400 ngày = 200k
 entry, ~5% đã soft delete):
@@ -246,3 +250,63 @@ xoá dòng và không xoá ảnh trên Cloudinary. Chưa có API khôi phục.
   trên Cloudinary với `photoUrls` trong DB.
 - Nếu cần Undo hoặc thùng rác, thêm route restore (đặt `deletedAt = null`)
   trong khoảng 30 ngày trước khi bị purge.
+
+### ADR-003 — Thư gửi tương lai (2026-10-01)
+
+**Quyết định:** module `letters` (`/letters`), thư niêm phong tới một thời điểm
+`deliverAt`. Trước thời điểm đó, nội dung thư không bao giờ rời backend.
+
+**Luật:**
+
+- Niêm phong rồi thì không đọc, không sửa; được xoá bất cứ lúc nào (xoá hẳn,
+  không soft delete). Tối đa 5.000 ký tự.
+- Tối đa 50 thư đang niêm phong mỗi user là **giới hạn mềm** chống lạm dụng:
+  đếm rồi mới ghi, không có ràng buộc ở DB, nên request song song có thể vượt
+  vài thư. Đã có `@Throttle` (10 lần/phút) chặn mức vượt; không đáng dùng
+  transaction `Serializable` cho việc này.
+- `GET /letters` trả `status` (`sealed | ready | opened`) và chỉ trả `preview`
+  cho thư đã mở. Nội dung đầy đủ chỉ có qua `POST /letters/:id/open`, là POST
+  vì nó ghi `openedAt` (GET không được có tác dụng phụ).
+- Thư định danh bằng `id` (không có khoá tự nhiên theo ngày như entry), nên mọi
+  truy vấn đều lọc `userId` lấy từ token cộng với `id`.
+
+**Múi giờ:** client tự tính `deliverAt` = 8:00 sáng ngày đã chọn theo giờ của
+trình duyệt, gửi lên dạng ISO. Server không cần thư viện múi giờ và giờ mùa hè
+được xử lý đúng. Server chỉ kiểm tra khoảng: ít nhất 6 giờ nữa (viết lúc gần
+nửa đêm thì 8:00 sáng mai chỉ cách khoảng 8 giờ), nhiều nhất 10 năm. Người viết
+đổi múi giờ sau đó thì thư vẫn mở đúng thời điểm UTC đã chốt.
+
+**Mở khoá không phụ thuộc cron:** `status` được tính khi đọc (`deliverAt <= now`),
+nên Render ngủ cũng không làm thư mở trễ trong app.
+
+**Email báo thư tới (cron mỗi giờ, phút 05):**
+
+- Không chứa nội dung thư, chỉ có link và thời gian tương đối ("a year ago"),
+  vì email kém an toàn hơn app. Không ghi ngày cụ thể vì server không biết múi
+  giờ của người nhận; lỗi 403 khi mở sớm cũng trả `deliverAt` dạng ISO để client
+  tự format thay vì ghi ngày trong message.
+- Bỏ qua thư người dùng đã tự mở trong app.
+- "Giành" thư trước khi gửi (`emailSentAt` qua `updateMany ... WHERE emailSentAt
+  IS NULL`), nên hai lần chạy không gửi trùng. Gửi lỗi thì trả lại và tăng
+  `emailAttempts`, tối đa 5 lần. Trả lại cũng dùng `updateMany` có điều kiện,
+  nên thư bị xoá giữa chừng không làm dừng cả lượt gửi. Nếu process chết đúng giữa lúc đã giành và
+  lúc gửi, email đó bị mất; chấp nhận được vì thư vẫn mở được trong app.
+- Link dùng `FRONTEND_LETTERS_URL`. Với `NODE_ENV=production`, env schema từ chối
+  khởi động nếu biến này (hoặc `FRONTEND_RESET_PASSWORD_URL`) còn trỏ về
+  `localhost`, để email gửi người dùng thật không chứa link hỏng.
+
+**Phần dùng chung:**
+
+- `MailSender` chuyển từ `auth` sang `src/modules/mail` (`MailModule`), vì `auth`
+  và `letters` đều gửi mail.
+- `Mood` chuyển sang `src/shared/mood.ts`, để `letters` không phụ thuộc domain
+  của `diaries`. `diaries` vẫn export lại dưới tên `DIARY_MOODS` / `DiaryMood`.
+- `ThrottlerModule.forRoot` chuyển từ `AuthModule` lên `AppModule`, vì giờ cả
+  `auth` và `letters` dùng `ThrottlerGuard`.
+
+**Kiểm tra trên Postgres thật (2026-10-01):** chạy `prisma migrate deploy` toàn bộ
+migration lên PGlite (giao thức Postgres), rồi gọi trực tiếp
+`PrismaFutureLetterRepository` và `PrismaDiaryEntryRepository`: 14 kịch bản
+(ownership, mở một lần, giành email độc quyền, cascade khi xoá user, soft delete,
+favorite trên entry đã xoá, `groupBy` stats, viết lại ngày đã xoá, purge) đều đúng.
+Nên đưa các kịch bản này vào integration test chạy trên Postgres của CI.

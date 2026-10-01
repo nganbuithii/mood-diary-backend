@@ -6,7 +6,7 @@ import {
   PASSWORD_RESET_TOKEN_REPOSITORY,
   PasswordResetTokenRepository,
 } from '../domain/password-reset-token.repository';
-import { MAIL_SENDER, MailSender } from '../domain/mail-sender';
+import { MAIL_SENDER, MailSender } from '../../mail/domain/mail-sender';
 
 export interface ForgotPasswordInput {
   email: string;
@@ -26,9 +26,6 @@ export class ForgotPasswordUseCase {
     const email = input.email.trim().toLowerCase();
     const user = await this.userRepository.findByEmail(email);
     if (!user) {
-      // Same (no-op) outcome whether or not the email exists — the controller
-      // always returns the same generic message, so this must not leak
-      // account existence via a different response or side effect.
       return;
     }
 

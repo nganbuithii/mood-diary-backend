@@ -1,8 +1,10 @@
 import { Song } from '../../songs/domain/song-catalog';
 
-export const DIARY_MOODS = ['VERY_SAD', 'SAD', 'NEUTRAL', 'HAPPY', 'VERY_HAPPY'] as const;
+import { MOODS, Mood } from '../../../shared/mood';
 
-export type DiaryMood = (typeof DIARY_MOODS)[number];
+export const DIARY_MOODS = MOODS;
+
+export type DiaryMood = Mood;
 
 export const MAX_ENTRY_PHOTOS = 3;
 
