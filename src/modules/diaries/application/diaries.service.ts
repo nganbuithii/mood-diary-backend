@@ -8,7 +8,7 @@ import {
 } from '../domain/diary-entry.repository';
 import { DIARY_PHOTO_STORAGE, DiaryPhotoStorage } from '../domain/diary-photo-storage';
 import { SongNotFoundError } from '../domain/song-not-found.error';
-import { monthRange, parseCalendarDate } from './calendar-date';
+import { monthRange, parseCalendarDate, parseLocalToday } from './calendar-date';
 import { deletePhotos } from './delete-photos';
 import { SONG_CATALOG, Song, SongCatalog } from '../../songs/domain/song-catalog';
 
@@ -31,14 +31,16 @@ export class DiariesService {
     @Inject(SONG_CATALOG) private readonly songCatalog: SongCatalog,
   ) {}
 
-  async upsertEntry(input: UpsertDiaryEntryRequest): Promise<DiaryEntryEntity> {
+  async upsertEntry(input: UpsertDiaryEntryRequest, now: Date = new Date()): Promise<DiaryEntryEntity> {
     const entryDate = parseCalendarDate(input.date);
-    const song = await this.resolveSong(input.songId);
     const liveEntry = await this.diaryEntryRepository.findByUserAndDate(input.userId, entryDate);
+    if (!liveEntry) parseLocalToday(input.date, now);
+
+    const song = await this.resolveSong(input.songId);
+    
     const deletedEntry = liveEntry
       ? null
       : await this.diaryEntryRepository.findDeletedByUserAndDate(input.userId, entryDate);
-
 
     const isRevivingDeleted = deletedEntry !== null;
     const note = input.note?.trim();

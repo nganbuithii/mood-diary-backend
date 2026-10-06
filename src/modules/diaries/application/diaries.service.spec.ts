@@ -2,8 +2,11 @@ import { DiariesService } from './diaries.service';
 import { DiaryEntryEntity, DiaryEntryRepository, UpsertDiaryEntryInput, MoodCount } from '../domain/diary-entry.repository';
 import { DiaryPhotoStorage, DiaryPhotoUploadResult } from '../domain/diary-photo-storage';
 import { InvalidEntryDateError } from '../domain/invalid-entry-date.error';
+import { LocalDateOutOfRangeError } from '../domain/local-date-out-of-range.error';
 import { SongNotFoundError } from '../domain/song-not-found.error';
 import { Song, SongCatalog } from '../../songs/domain/song-catalog';
+
+const NOW = new Date('2026-09-25T12:00:00.000Z');
 
 const SUNFLOWER: Song = {
   id: '1445931937',
@@ -178,7 +181,7 @@ describe('DiariesService', () => {
         date: '2026-09-25',
         mood: 'HAPPY',
         note: '  Great day  ',
-      });
+      }, NOW);
 
       expect(diaryEntryRepository.upsertCalls).toEqual([
         {
@@ -195,7 +198,7 @@ describe('DiariesService', () => {
     it('normalizes a missing or blank note to null', async () => {
       const { service, diaryEntryRepository } = setup();
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'NEUTRAL', note: '   ' });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'NEUTRAL', note: '   ' }, NOW);
 
       expect(diaryEntryRepository.upsertCalls[0]).toMatchObject({ note: null });
     });
@@ -209,7 +212,7 @@ describe('DiariesService', () => {
           date: '2026-02-30',
           mood: 'HAPPY',
           photos: [Buffer.from('x')],
-        }),
+        }, NOW),
       ).rejects.toThrow(InvalidEntryDateError);
       expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
@@ -223,7 +226,7 @@ describe('DiariesService', () => {
         date: '2026-09-25',
         mood: 'HAPPY',
         photos: [Buffer.from('a'), Buffer.from('b')],
-      });
+      }, NOW);
 
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(2);
       expect(diaryEntryRepository.upsertCalls[0].photoUrls).toEqual([
@@ -236,7 +239,7 @@ describe('DiariesService', () => {
     it('leaves existing photos untouched when no photos are sent', async () => {
       const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', photos: [] });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', photos: [] }, NOW);
 
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
       expect(diaryEntryRepository.upsertCalls[0].photoUrls).toBeUndefined();
@@ -250,7 +253,7 @@ describe('DiariesService', () => {
         date: '2026-09-25',
         mood: 'HAPPY',
         photos: [Buffer.from('a'), Buffer.from('b'), Buffer.from('c'), Buffer.from('d')],
-      });
+      }, NOW);
 
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(3);
       expect(diaryEntryRepository.upsertCalls[0].photoUrls).toHaveLength(3);
@@ -259,7 +262,7 @@ describe('DiariesService', () => {
     it('leaves the current song untouched when no songId is sent', async () => {
       const { service, diaryEntryRepository } = setup();
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY' });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY' }, NOW);
 
       expect(diaryEntryRepository.upsertCalls[0].song).toBeUndefined();
     });
@@ -267,7 +270,7 @@ describe('DiariesService', () => {
     it('clears the song when songId is an empty string', async () => {
       const { service, diaryEntryRepository } = setup();
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', songId: '' });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', songId: '' }, NOW);
 
       expect(diaryEntryRepository.upsertCalls[0].song).toBeNull();
     });
@@ -280,7 +283,7 @@ describe('DiariesService', () => {
         date: '2026-09-25',
         mood: 'HAPPY',
         songId: SUNFLOWER.id,
-      });
+      }, NOW);
 
       expect(diaryEntryRepository.upsertCalls[0].song).toEqual(SUNFLOWER);
       expect(entry.songTitle).toBe('Sunflower');
@@ -296,7 +299,7 @@ describe('DiariesService', () => {
           mood: 'HAPPY',
           songId: '999',
           photos: [Buffer.from('a')],
-        }),
+        }, NOW),
       ).rejects.toThrow(SongNotFoundError);
       expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
       expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
@@ -315,7 +318,7 @@ describe('DiariesService', () => {
       it('starts a fresh page: clears photos, song and favorite left from the deleted entry', async () => {
         const { service, diaryEntryRepository } = setup([deletedEntry]);
 
-        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' }, NOW);
 
         expect(diaryEntryRepository.upsertCalls[0]).toMatchObject({ photoUrls: [], song: null, isFavorite: false });
       });
@@ -329,7 +332,7 @@ describe('DiariesService', () => {
           mood: 'SAD',
           photos: [Buffer.from('a')],
           songId: SUNFLOWER.id,
-        });
+        }, NOW);
 
         expect(diaryEntryRepository.upsertCalls[0]).toMatchObject({
           photoUrls: ['https://cdn.test/user-1/1.jpg'],
@@ -341,11 +344,62 @@ describe('DiariesService', () => {
       it("ignores another user's deleted entry on the same date", async () => {
         const { service, diaryEntryRepository } = setup([{ ...deletedEntry, userId: 'user-2' }]);
 
-        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+        await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' }, NOW);
 
         expect(diaryEntryRepository.upsertCalls[0].photoUrls).toBeUndefined();
         expect(diaryEntryRepository.upsertCalls[0].isFavorite).toBeUndefined();
       });
+    });
+  });
+
+  describe('upsertEntry date window', () => {
+    it("rejects a new entry for a past day without uploading photos", async () => {
+      const { service, diaryEntryRepository, diaryPhotoStorage } = setup();
+
+      await expect(
+        service.upsertEntry({ userId: 'user-1', date: '2026-09-20', mood: 'HAPPY', photos: [Buffer.from('a')] }, NOW),
+      ).rejects.toThrow(LocalDateOutOfRangeError);
+      expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
+      expect(diaryPhotoStorage.uploadCalls).toHaveLength(0);
+    });
+
+    it('rejects a new entry written ahead for a future day', async () => {
+      const { service, diaryEntryRepository } = setup();
+
+      await expect(
+        service.upsertEntry({ userId: 'user-1', date: '2026-09-28', mood: 'HAPPY' }, NOW),
+      ).rejects.toThrow(LocalDateOutOfRangeError);
+      expect(diaryEntryRepository.upsertCalls).toHaveLength(0);
+    });
+
+    it('rejects rewriting a past day whose entry was deleted', async () => {
+      const deletedEntry = buildEntry({
+        entryDate: new Date('2026-09-20T00:00:00.000Z'),
+        deletedAt: new Date('2026-09-21T00:00:00.000Z'),
+      });
+      const { service } = setup([deletedEntry]);
+
+      await expect(
+        service.upsertEntry({ userId: 'user-1', date: '2026-09-20', mood: 'SAD' }, NOW),
+      ).rejects.toThrow(LocalDateOutOfRangeError);
+    });
+
+    it('still allows editing an existing entry on a past day', async () => {
+      const pastEntry = buildEntry({ entryDate: new Date('2026-09-20T00:00:00.000Z') });
+      const { service, diaryEntryRepository } = setup([pastEntry]);
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-20', mood: 'SAD', note: 'edited' }, NOW);
+
+      expect(diaryEntryRepository.upsertCalls).toHaveLength(1);
+    });
+
+    it("accepts a new entry one day off UTC, as the user's local today may differ", async () => {
+      const { service, diaryEntryRepository } = setup();
+
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-26', mood: 'HAPPY' }, NOW);
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-24', mood: 'HAPPY' }, NOW);
+
+      expect(diaryEntryRepository.upsertCalls).toHaveLength(2);
     });
   });
 
@@ -355,7 +409,7 @@ describe('DiariesService', () => {
     it('deletes the previous photos from storage once new ones replace them', async () => {
       const { service, diaryPhotoStorage } = setup([liveEntry]);
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] }, NOW);
 
       expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-1.jpg', 'https://cdn.test/old-2.jpg']);
     });
@@ -363,7 +417,7 @@ describe('DiariesService', () => {
     it('keeps the photos when the edit sends no new ones', async () => {
       const { service, diaryPhotoStorage } = setup([liveEntry]);
 
-      const entry = await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', note: 'edited' });
+      const entry = await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD', note: 'edited' }, NOW);
 
       expect(diaryPhotoStorage.deletedUrls).toEqual([]);
       expect(entry.photoUrls).toEqual(liveEntry.photoUrls);
@@ -376,7 +430,7 @@ describe('DiariesService', () => {
       });
       const { service, diaryPhotoStorage } = setup([deletedEntry]);
 
-      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' });
+      await service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'SAD' }, NOW);
 
       expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-1.jpg']);
     });
@@ -390,7 +444,7 @@ describe('DiariesService', () => {
         date: '2026-09-25',
         mood: 'HAPPY',
         photos: [Buffer.from('a')],
-      });
+      }, NOW);
 
       expect(entry.photoUrls).toEqual(['https://cdn.test/user-1/1.jpg']);
       expect(diaryPhotoStorage.deletedUrls).toEqual(['https://cdn.test/old-2.jpg']);
@@ -401,7 +455,7 @@ describe('DiariesService', () => {
       diaryEntryRepository.upsert = () => Promise.reject(new Error('db down'));
 
       await expect(
-        service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] }),
+        service.upsertEntry({ userId: 'user-1', date: '2026-09-25', mood: 'HAPPY', photos: [Buffer.from('a')] }, NOW),
       ).rejects.toThrow('db down');
       expect(diaryPhotoStorage.deletedUrls).toEqual([]);
     });

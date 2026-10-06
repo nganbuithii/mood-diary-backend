@@ -112,7 +112,9 @@ export class DiariesController {
     },
   })
   @ApiOkResponse({ description: 'Entry created or updated for that date', type: DiaryEntryResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid date, mood, note, photo or song' })
+  @ApiBadRequestResponse({
+    description: "Invalid date, mood, note, photo or song, or a new entry for a day other than the user's local today",
+  })
   @ApiBadGatewayResponse({ description: 'Song catalog is unavailable' })
   @ApiPayloadTooLargeResponse({ description: 'A photo exceeds 5MB' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid access token' })
@@ -134,6 +136,9 @@ export class DiariesController {
     } catch (error) {
       if (error instanceof InvalidEntryDateError) {
         throw new BadRequestException(error.message);
+      }
+      if (error instanceof LocalDateOutOfRangeError) {
+        throw new BadRequestException("Past or future days can't be written. Only today's entry can be added.");
       }
       if (error instanceof SongNotFoundError) {
         throw new BadRequestException('Song not found');
