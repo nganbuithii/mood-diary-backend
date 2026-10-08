@@ -57,6 +57,6 @@ import { MailModule } from '../mail/mail.module';
     { provide: RESET_TOKEN_ISSUER, useClass: CryptoResetTokenIssuer },
     { provide: PASSWORD_RESET_TOKEN_REPOSITORY, useClass: PrismaPasswordResetTokenRepository },
   ],
-  exports: [JwtAuthGuard, JwtModule],
+  exports: [JwtAuthGuard, JwtModule, USER_REPOSITORY, PASSWORD_HASHER],
 })
 export class AuthModule {}

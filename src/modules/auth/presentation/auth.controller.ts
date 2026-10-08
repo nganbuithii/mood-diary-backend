@@ -39,7 +39,13 @@ import { InvalidRefreshTokenError } from '../domain/invalid-refresh-token.error'
 import { InvalidResetTokenError } from '../domain/invalid-reset-token.error';
 import { AccessTokenPayload } from '../domain/token-issuer';
 import { USER_REPOSITORY, UserRepository } from '../domain/user.repository';
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE_PATH } from '../infrastructure/auth-cookies';
+import {
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE_PATH,
+  baseAuthCookieOptions,
+  clearAuthCookies,
+} from '../infrastructure/auth-cookies';
 import { JwtAuthGuard } from '../infrastructure/jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -207,11 +213,7 @@ export class AuthController {
   }
 
   private baseCookieOptions(): CookieOptions {
-    return {
-      httpOnly: true,
-      secure: this.configService.get<boolean>('COOKIE_SECURE', false),
-      sameSite: 'lax',
-    };
+    return baseAuthCookieOptions(this.configService.get<boolean>('COOKIE_SECURE', false));
   }
 
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
@@ -231,7 +233,6 @@ export class AuthController {
   }
 
   private clearAuthCookies(res: Response): void {
-    res.clearCookie(ACCESS_TOKEN_COOKIE, { ...this.baseCookieOptions(), path: '/' });
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { ...this.baseCookieOptions(), path: REFRESH_TOKEN_COOKIE_PATH });
+    clearAuthCookies(res, this.configService.get<boolean>('COOKIE_SECURE', false));
   }
 }

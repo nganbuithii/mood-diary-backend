@@ -5,7 +5,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { AvatarStorage, AvatarUploadResult } from '../domain/avatar-storage';
 import { InvalidAvatarImageError } from '../domain/invalid-avatar-image.error';
 
-const AVATAR_FOLDER = 'mood-diary/avatars';
+export const AVATAR_FOLDER = 'mood-diary/avatars';
 
 @Injectable()
 export class CloudinaryAvatarStorage implements AvatarStorage {
