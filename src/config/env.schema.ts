@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Links to these end up in emails sent to real users, so a localhost default must never reach production.
-const PUBLIC_FRONTEND_URLS = ['FRONTEND_RESET_PASSWORD_URL', 'FRONTEND_LETTERS_URL'] as const;
+const PUBLIC_FRONTEND_URLS = ['FRONTEND_RESET_PASSWORD_URL', 'FRONTEND_LETTERS_URL', 'FRONTEND_APP_URL'] as const;
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -18,6 +18,7 @@ export const envSchema = z.object({
   PASSWORD_RESET_TOKEN_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(900),
   FRONTEND_RESET_PASSWORD_URL: z.string().url().default('http://localhost:3000/reset-password'),
   FRONTEND_LETTERS_URL: z.string().url().default('http://localhost:3000/letters'),
+  FRONTEND_APP_URL: z.string().url().default('http://localhost:3000'),
   
   MAIL_FROM: z.string().default('no-reply@mood-diary.app'),
   SMTP_HOST: z.string().optional(),

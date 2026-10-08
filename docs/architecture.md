@@ -72,7 +72,8 @@ Nguồn chuẩn là `prisma/schema.prisma`. Bảng dưới là bản tóm tắt,
 2026-10-01.
 
 ```
-User               (id, email UNIQUE, passwordHash, displayName, avatarUrl?, createdAt, updatedAt)
+User               (id, email UNIQUE, passwordHash, displayName, avatarUrl?, createdAt, updatedAt,
+                    reminderEnabled, reminderHour, timeZone, reminderSentOn DATE?)
 RefreshToken       (id, userId FK, tokenHash UNIQUE, familyId, revokedAt?, replacedByTokenId?, expiresAt, createdAt)
 PasswordResetToken (id, userId FK, tokenHash UNIQUE, usedAt?, expiresAt, createdAt)
 MoodEntry          (id, userId FK, entryDate DATE, mood enum, note?, photoUrls text[],
@@ -310,3 +311,34 @@ migration lên PGlite (giao thức Postgres), rồi gọi trực tiếp
 (ownership, mở một lần, giành email độc quyền, cascade khi xoá user, soft delete,
 favorite trên entry đã xoá, `groupBy` stats, viết lại ngày đã xoá, purge) đều đúng.
 Nên đưa các kịch bản này vào integration test chạy trên Postgres của CI.
+
+### ADR-004 — Email nhắc check-in hằng ngày (2026-10-08)
+
+**Bối cảnh:** streak và thói quen viết mỗi ngày là cốt lõi của app, nhưng app chưa có
+cách nào kéo người dùng quay lại.
+
+**Quyết định:**
+
+- Cài đặt nằm trên `User`: `reminderEnabled` (mặc định tắt), `reminderHour` (0–23,
+  mặc định 20), `timeZone` (tên IANA, client gửi lên từ
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` mỗi lần lưu), `reminderSentOn`
+  (ngày địa phương đã gửi). API: `GET/PUT /users/me/reminder`, nằm ở module mới
+  `reminders` (cùng kiểu với `letters`: use case + repository + scheduler).
+- Cron mỗi giờ (phút 00, UTC). Gửi khi giờ địa phương **≥** `reminderHour`, hôm nay
+  chưa gửi, và hôm nay chưa có entry (chưa xoá mềm). Dùng "≥" thay vì "đúng giờ" để
+  lần chạy bị lỡ khi Render ngủ vẫn gửi bù trong cùng ngày.
+- Chống gửi trùng giống email báo thư: "giành" ngày bằng `updateMany ... WHERE
+  reminderSentOn IS DISTINCT FROM <ngày>`, gửi lỗi thì trả lại giá trị cũ để lần sau
+  thử lại. Không giới hạn số lần thử vì mỗi ngày là một lượt mới.
+- Múi giờ được kiểm tra bằng `Intl.DateTimeFormat` (không thêm thư viện). Tên không hợp
+  lệ trả 400.
+- Link trong email dùng `FRONTEND_APP_URL` (`/home` để viết, `/profile` để tắt nhắc).
+  Biến này cũng bị env schema chặn trỏ về `localhost` khi `NODE_ENV=production`.
+
+**Hệ quả / giới hạn:**
+
+- Cron chạy trong process: Render free ngủ thì không có lượt chạy nào; người dùng chỉ
+  nhận email khi server thức trong khoảng từ giờ hẹn tới hết ngày. Muốn chắc chắn hơn
+  thì gọi một endpoint/cron từ bên ngoài (ví dụ cron-job.org) để đánh thức server.
+- `findEnabled` quét toàn bộ user bật nhắc mỗi giờ rồi tính giờ địa phương trong app.
+  Đủ cho quy mô hiện tại; khi nhiều user hơn có thể lọc sẵn theo UTC offset.

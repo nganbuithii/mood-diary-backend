@@ -10,6 +10,7 @@ import { UsersModule } from './modules/users/users.module';
 import { DiariesModule } from './modules/diaries/diaries.module';
 import { LettersModule } from './modules/letters/letters.module';
 import { SongsModule } from './modules/songs/songs.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SongsModule } from './modules/songs/songs.module';
     DiariesModule,
     LettersModule,
     SongsModule,
+    RemindersModule,
   ],
 })
 export class AppModule {}

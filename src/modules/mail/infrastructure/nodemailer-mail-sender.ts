@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
-import { MailSender, SendLetterReadyEmailInput, SendPasswordResetEmailInput } from '../domain/mail-sender';
+import {
+  MailSender,
+  SendDailyReminderEmailInput,
+  SendLetterReadyEmailInput,
+  SendPasswordResetEmailInput,
+} from '../domain/mail-sender';
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+}
 
 @Injectable()
 export class NodemailerMailSender implements MailSender {
@@ -42,6 +51,21 @@ Open it here: ${input.openLink}
 
 Only you can read it, inside Mood Diary.`,
       html: `<p>The letter you sealed <strong>${input.sealedAgo}</strong> is ready to open.</p><p><a href="${input.openLink}">Open your letter</a></p><p>Only you can read it, inside Mood Diary.</p>`,
+    });
+  }
+
+  async sendDailyReminderEmail(input: SendDailyReminderEmailInput): Promise<void> {
+    const name = escapeHtml(input.displayName);
+    await this.transporter.sendMail({
+      from: this.from,
+      to: input.to,
+      subject: 'How are you feeling today? ♡',
+      text: `Hi ${input.displayName},
+
+Your diary is saving a little space for today. Take a moment to note how you feel: ${input.writeLink}
+
+You can change or turn off this reminder in your profile: ${input.settingsLink}`,
+      html: `<p>Hi ${name},</p><p>Your diary is saving a little space for today. Take a moment to note how you feel ♡</p><p><a href="${input.writeLink}">Write today's page</a></p><p style="color:#888;font-size:12px">You can change or turn off this reminder in <a href="${input.settingsLink}">your profile</a>.</p>`,
     });
   }
 }

@@ -9,9 +9,17 @@ export interface SendLetterReadyEmailInput {
   sealedAgo: string;
 }
 
+export interface SendDailyReminderEmailInput {
+  to: string;
+  displayName: string;
+  writeLink: string;
+  settingsLink: string;
+}
+
 export interface MailSender {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
   sendLetterReadyEmail(input: SendLetterReadyEmailInput): Promise<void>;
+  sendDailyReminderEmail(input: SendDailyReminderEmailInput): Promise<void>;
 }
 
 export const MAIL_SENDER = Symbol('MAIL_SENDER');

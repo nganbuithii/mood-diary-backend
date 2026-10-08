@@ -11,6 +11,7 @@ const BASE = {
 const DEPLOYED = {
   FRONTEND_RESET_PASSWORD_URL: 'https://mood-diary.app/reset-password',
   FRONTEND_LETTERS_URL: 'https://mood-diary.app/letters',
+  FRONTEND_APP_URL: 'https://mood-diary.app',
 };
 
 describe('validateEnv', () => {
@@ -24,7 +25,7 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...BASE, ...DEPLOYED, NODE_ENV: 'production' })).not.toThrow();
   });
 
-  it.each(['FRONTEND_RESET_PASSWORD_URL', 'FRONTEND_LETTERS_URL'])(
+  it.each(['FRONTEND_RESET_PASSWORD_URL', 'FRONTEND_LETTERS_URL', 'FRONTEND_APP_URL'])(
     'refuses to start in production when %s is left on localhost',
     (key) => {
       const env = { ...BASE, ...DEPLOYED, NODE_ENV: 'production' } as Record<string, string>;

@@ -24,11 +24,20 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  reminderEnabled Boolean   @default(false)
+  // Local hour (0-23) in `timeZone` after which the daily check-in reminder may go out.
+  reminderHour    Int       @default(20)
+  // IANA zone name, e.g. "Asia/Ho_Chi_Minh"; reported by the browser when reminders are saved.
+  timeZone        String    @default("UTC")
+  // Local calendar day the last reminder was sent, so a day never gets two.
+  reminderSentOn  DateTime? @db.Date
+
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   moodEntries         MoodEntry[]
   futureLetters       FutureLetter[]
 
+  @@index([reminderEnabled])
   @@map("users")
 }
 model RefreshToken {

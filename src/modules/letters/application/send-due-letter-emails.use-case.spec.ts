@@ -20,6 +20,10 @@ class FakeMailSender implements MailSender {
     this.sent.push(input);
     return Promise.resolve();
   }
+
+  sendDailyReminderEmail(): Promise<void> {
+    throw new Error('not used in letter email tests');
+  }
 }
 
 function setup(letters: ReturnType<typeof buildLetter>[], emails: Record<string, string> = {}) {

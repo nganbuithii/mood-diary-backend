@@ -97,6 +97,10 @@ class FakeMailSender implements MailSender {
   sendLetterReadyEmail(): Promise<void> {
     throw new Error('not used in forgot-password tests');
   }
+
+  sendDailyReminderEmail(): Promise<void> {
+    throw new Error('not used in forgot-password tests');
+  }
 }
 
 function buildConfig(values: Record<string, unknown> = {}): ConfigService {
