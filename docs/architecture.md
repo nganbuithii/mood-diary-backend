@@ -81,6 +81,7 @@ MoodEntry          (id, userId FK, entryDate DATE, mood enum, note?, photoUrls t
                     isFavorite, deletedAt?, createdAt, updatedAt)
 FutureLetter       (id, userId FK, body, moodAtWriting?, deliverAt, openedAt?,
                     emailSentAt?, emailAttempts, createdAt)
+UserAchievement    (userId FK, achievementId, level, seenLevel, updatedAt) PK (userId, achievementId)
 
 enum Mood: VERY_SAD | SAD | NEUTRAL | HAPPY | VERY_HAPPY
 ```
@@ -100,6 +101,7 @@ và entry của user đó.
 | `MoodEntry(deletedAt)` index | Job purge tìm entry đã soft delete quá hạn. Thiếu index này, truy vấn phải quét gần hết bảng khi có ít entry bị xoá (đo 2026-10-01, 200k dòng: ~500–1200 ms → 0.4 ms) |
 | `FutureLetter(userId, deliverAt)` index | Hộp thư của một user, sắp theo ngày mở |
 | `FutureLetter(emailSentAt, deliverAt)` index | Cron tìm thư đã tới hạn mà chưa gửi email |
+| `UserAchievement(userId, achievementId)` PK | Một dòng cho mỗi thành tích của user; là khoá cho ghi "chỉ tăng" (ADR-005) |
 
 Kết quả đo `EXPLAIN ANALYZE` (2026-10-01, PGlite, 500 user × 400 ngày = 200k
 entry, ~5% đã soft delete):
@@ -122,8 +124,9 @@ Ghi chú về `MoodEntry`:
   tối đa 3 ảnh.
 - `deletedAt` khác null nghĩa là entry đã bị soft delete (ADR-002).
 
-Chưa có `Tag`/`DiaryTag`, `Streak`/`Achievement`. Streak được tính lại từ
-các entry ở mỗi request, không lưu.
+Chưa có `Tag`/`DiaryTag`, `Streak`. Streak được tính lại từ các entry ở mỗi
+request, không lưu. Thành tích cũng tính lại như vậy, chỉ lưu cấp cao nhất
+từng đạt (`UserAchievement`, ADR-005).
 
 ## 6. Roadmap
 
@@ -342,3 +345,37 @@ cách nào kéo người dùng quay lại.
   thì gọi một endpoint/cron từ bên ngoài (ví dụ cron-job.org) để đánh thức server.
 - `findEnabled` quét toàn bộ user bật nhắc mỗi giờ rồi tính giờ địa phương trong app.
   Đủ cho quy mô hiện tại; khi nhiều user hơn có thể lọc sẵn theo UTC offset.
+
+### ADR-005 — Thành tích và huy hiệu tháng
+
+**Bối cảnh:** frontend có trang thành tích (`/achievements`): huy hiệu nhiều cấp
+(số trang, kỷ lục streak, trang có ảnh/bài hát, favorite, thư, số mood khác nhau, số lần quay
+lại sau khi nghỉ) và huy hiệu tháng (đủ 10 trang trong tháng). Nguyên tắc sản phẩm: không gây
+áp lực, huy hiệu đã có thì không mất.
+
+**Quyết định:**
+
+- Module mới `achievements` (domain/application/infrastructure/presentation, cùng kiểu
+  `letters`). API: `GET /achievements?date=YYYY-MM-DD` (ngày địa phương hôm nay, kiểm tra như
+  `/diaries/streak`) và `POST /achievements/:id/seen` (204, id lạ trả 404).
+- Giá trị tính lại từ entry ở mỗi request, giống streak: 1 query lấy mọi entry còn sống (chỉ
+  các cột cần) + 1 query đếm thư; luật đếm nằm trong use case. Mốc cấp nằm trong code
+  (`achievement-catalog.ts`), không lưu DB.
+- Chỉ lưu `UserAchievement(level, seenLevel)`: `level` là mức cao nhất từng đạt để xoá trang
+  không làm tụt cấp; `seenLevel` để tag "New" đồng bộ giữa các thiết bị. Ghi "chỉ tăng":
+  `createMany skipDuplicates` rồi `updateMany WHERE level < x`, nên 2 request chạy song song
+  không thể hạ cấp, không cần transaction.
+- `GET` có ghi (nâng `level`) — chấp nhận vì việc ghi là idempotent và chỉ ghi lại điều đã
+  suy ra được từ dữ liệu; tách thành bước ghi riêng khi lưu entry sẽ phải nối `diaries` →
+  `achievements`, phức tạp hơn mà không lợi gì.
+- Huy hiệu tháng **không lưu**: tính từ entry, trả tháng hiện tại + các tháng đạt mục tiêu
+  (tháng bị lỡ không trả về).
+- Dùng lại `computeStreak` và `parseLocalToday` của `diaries` (hàm thuần), không viết lại.
+
+**Hệ quả / giới hạn:**
+
+- Xoá trang của một tháng cũ có thể làm mất huy hiệu tháng đó. Chấp nhận vì hiếm; nếu cần giữ
+  vĩnh viễn thì thêm bảng `UserMonthlyBadge(userId, month)` theo cùng kiểu "chỉ thêm".
+- Mỗi lần mở trang đọc mọi entry của user (như streak). Đủ cho quy mô hiện tại; khi lớn hơn có
+  thể chuyển phần đếm sang `count`/`groupBy`.
+- Chưa đưa thành tích vào file export của tài khoản.

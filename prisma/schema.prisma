@@ -36,6 +36,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   moodEntries         MoodEntry[]
   futureLetters       FutureLetter[]
+  achievements        UserAchievement[]
 
   @@index([reminderEnabled])
   @@map("users")
@@ -114,4 +115,20 @@ model FutureLetter {
   @@index([userId, deliverAt])
   @@index([emailSentAt, deliverAt])
   @@map("future_letters")
+}
+
+// Highest level reached per achievement. Values are derived from entries on every request;
+// only the high-water mark is stored so a level never drops when pages are deleted.
+model UserAchievement {
+  userId        String
+  achievementId String
+  level         Int
+  // Highest level the user has looked at; anything above it is shown as "new".
+  seenLevel     Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@map("user_achievements")
 }

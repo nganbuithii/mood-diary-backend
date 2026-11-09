@@ -13,8 +13,6 @@ export interface Streak {
   writtenToday: boolean;
 }
 
-// Derived from entries on every request instead of stored: backfilled, edited or deleted
-// entries and timezone changes would otherwise leave a stored counter out of sync.
 @Injectable()
 export class GetStreakUseCase {
   constructor(
@@ -23,15 +21,16 @@ export class GetStreakUseCase {
 
   async execute(input: GetStreakInput, now: Date = new Date()): Promise<Streak> {
     const today = parseLocalToday(input.today, now);
-    // Entries dated after today are ignored, so writing ahead cannot inflate the streak.
-    const entryDates = await this.diaryEntryRepository.findEntryDatesOnOrBefore(input.userId, today);
+    const entryDates = await this.diaryEntryRepository.findEntryDatesOnOrBefore(
+      input.userId,
+      today,
+    );
+
     return computeStreak(entryDates, today);
   }
 }
 
-// entryDates must be newest first. The current streak survives until the end of today
-// when the user wrote yesterday, so it does not drop to 0 every morning.
-function computeStreak(entryDates: Date[], today: Date): Streak {
+export function computeStreak(entryDates: Date[], today: Date): Streak {
   const days = entryDates.map(toDayNumber);
   const todayNumber = toDayNumber(today);
   const isAlive = days.length > 0 && todayNumber - days[0] <= 1;

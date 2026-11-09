@@ -11,6 +11,7 @@ import { DiariesModule } from './modules/diaries/diaries.module';
 import { LettersModule } from './modules/letters/letters.module';
 import { SongsModule } from './modules/songs/songs.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
+import { AchievementsModule } from './modules/achievements/achievements.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RemindersModule } from './modules/reminders/reminders.module';
     LettersModule,
     SongsModule,
     RemindersModule,
+    AchievementsModule,
   ],
 })
 export class AppModule {}
